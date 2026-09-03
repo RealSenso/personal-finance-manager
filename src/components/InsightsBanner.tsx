@@ -66,21 +66,16 @@ export const InsightsBanner: React.FC<InsightsBannerProps> = ({
   };
 
   return (
-    <div className="space-y-2.5">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-          <span className="text-xs font-semibold text-zinc-300 uppercase tracking-wider">
-            Rule-Based Insights ({activeInsights.length})
-          </span>
-          <span className="text-[11px] text-zinc-500 font-mono">
-            Pure Math Engine • No Cloud/LLM
-          </span>
-        </div>
+    <div className="bl-panel bl-cut bg-zinc-900/40 border border-zinc-800 rounded-2xl p-3 space-y-2.5">
+      <div className="flex items-center gap-2">
+        <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+        <span className="bl-label text-emerald-400">
+          Field Analysis ({activeInsights.length})
+        </span>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
-        {activeInsights.slice(0, 4).map((item) => (
+      <div className="grid grid-cols-1 gap-2.5">
+        {activeInsights.slice(0, 6).map((item) => (
           <div
             key={item.id}
             className={`border rounded-xl p-3.5 flex items-start justify-between gap-3 transition-colors ${getBorderColor(

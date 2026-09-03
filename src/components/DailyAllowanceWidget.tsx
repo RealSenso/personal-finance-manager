@@ -36,8 +36,8 @@ export const DailyAllowanceWidget: React.FC<DailyAllowanceWidgetProps> = ({
         : 'text-zinc-400';
 
   return (
-    <div className="bg-gradient-to-br from-zinc-900 via-zinc-900 to-zinc-950 border border-zinc-800/90 rounded-2xl p-4 sm:p-5 shadow-lg relative overflow-hidden">
-      <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-500/5 rounded-full blur-3xl pointer-events-none" />
+    <div className="bl-panel bl-cut shrink-0 bg-gradient-to-br from-zinc-900 via-zinc-900 to-zinc-950 border border-emerald-500/25 rounded-2xl p-4 shadow-lg relative overflow-hidden glow-blue">
+      <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
 
       <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 relative z-10">
         <div className="flex items-start sm:items-center gap-4">
@@ -46,18 +46,16 @@ export const DailyAllowanceWidget: React.FC<DailyAllowanceWidgetProps> = ({
           </div>
 
           <div>
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-semibold tracking-wide uppercase text-emerald-400">
-                Safe Daily Spend
-              </span>
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="bl-label text-emerald-400">Safe Daily Spend</span>
               <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-zinc-800 text-zinc-300 border border-zinc-700/60">
-                {allowance.remainingDays} days left
+                {allowance.remainingDays}d left
               </span>
-              <span className={`text-[10px] font-mono ${paceTone}`}>{paceLabel}</span>
+              <span className={`text-[10px] font-display uppercase tracking-wider ${paceTone}`}>{paceLabel}</span>
             </div>
 
             <div className="flex items-baseline gap-2.5 mt-1">
-              <span className="text-2xl sm:text-3xl font-extrabold text-white font-mono tracking-tight">
+              <span className="font-display text-3xl sm:text-4xl font-bold text-white tracking-tight tabular-nums text-glow anim-pulse">
                 {formatCurrency(allowance.safeDailyAllowance)}
               </span>
               <span className="text-xs font-medium text-zinc-400">/ day</span>

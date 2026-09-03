@@ -42,13 +42,11 @@ export const DebtsSummary: React.FC<DebtsSummaryProps> = ({
   const grandTotal = people.reduce((s, p) => s + p.total, 0);
 
   return (
-    <div className="bg-zinc-900/80 border border-amber-500/25 rounded-xl p-4 space-y-3">
+    <div className="bl-panel bl-cut bg-zinc-900/60 border border-amber-500/30 rounded-2xl p-3.5 space-y-3">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <HandCoins className="w-4 h-4 text-amber-400" />
-          <h2 className="text-sm font-bold text-zinc-100 tracking-tight">
-            Money You Owe
-          </h2>
+          <span className="bl-label text-amber-400">Debts — Money You Owe</span>
         </div>
         <span className="text-sm font-mono font-bold text-amber-400">
           {formatCurrency(grandTotal)}

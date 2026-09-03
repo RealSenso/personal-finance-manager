@@ -1,1 +1,172 @@
 @import "tailwindcss";
+
+/* ============================================================
+   BLUE LOCK — theme tokens
+   The zinc / emerald ramps are overridden so the whole existing
+   component tree recolours to an electric-blue / midnight scheme
+   without touching every file.
+   ============================================================ */
+@theme {
+  --font-sans: "Inter", system-ui, -apple-system, sans-serif;
+  --font-display: "Chakra Petch", "Inter", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", monospace;
+
+  /* midnight navy ramp (was zinc) */
+  --color-zinc-950: #04060d;
+  --color-zinc-900: #0a1020;
+  --color-zinc-800: #17223f;
+  --color-zinc-700: #26345c;
+  --color-zinc-600: #3a4a76;
+  --color-zinc-500: #5a6a94;
+  --color-zinc-400: #8b97b6;
+  --color-zinc-300: #aeb9d6;
+  --color-zinc-200: #d4dcf0;
+  --color-zinc-100: #eef2fd;
+
+  /* electric blue ramp (was emerald = the "primary / positive" accent) */
+  --color-emerald-950: #08183f;
+  --color-emerald-900: #0d245c;
+  --color-emerald-500: #2f6bff;
+  --color-emerald-400: #5b90ff;
+  --color-emerald-300: #93b6ff;
+  --color-emerald-200: #c2d6ff;
+
+  /* indigo nudged toward the same blue so accents stay cohesive */
+  --color-indigo-400: #6f8dff;
+  --color-indigo-500: #4c6bff;
+
+  /* keep cyan (energy), rose (goal / danger), amber (caution) */
+  --color-cyan-400: #29d3ee;
+  --color-purple-400: #8b7dff;
+
+  --bl-glow: 0 0 22px rgba(93, 148, 255, 0.45);
+}
+
+@layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+  body {
+    margin: 0;
+    overflow: hidden; /* page never scrolls — only components do */
+    background: #04060d;
+    color: var(--color-zinc-100);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+  }
+  /* ambient arena backdrop */
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    background:
+      radial-gradient(1100px 620px at 12% -12%, rgba(47, 107, 255, 0.22), transparent 60%),
+      radial-gradient(900px 520px at 112% 8%, rgba(41, 211, 238, 0.1), transparent 55%),
+      radial-gradient(700px 700px at 50% 130%, rgba(76, 107, 255, 0.12), transparent 60%),
+      repeating-linear-gradient(118deg, rgba(255, 255, 255, 0.014) 0 1px, transparent 1px 8px);
+  }
+  h1, h2, h3, h4, h5 {
+    font-family: var(--font-display);
+    letter-spacing: 0.01em;
+  }
+  ::selection {
+    background: rgba(47, 107, 255, 0.35);
+    color: #fff;
+  }
+}
+
+@layer components {
+  /* scroll region: the ONLY things allowed to scroll */
+  .bl-scroll {
+    overflow-y: auto;
+    min-height: 0;
+    scrollbar-width: thin;
+    scrollbar-color: #26345c transparent;
+  }
+  .bl-scroll::-webkit-scrollbar { width: 8px; height: 8px; }
+  .bl-scroll::-webkit-scrollbar-track { background: transparent; }
+  .bl-scroll::-webkit-scrollbar-thumb {
+    background: linear-gradient(#2f6bff, #1a2a52);
+    border-radius: 99px;
+  }
+
+  /* thin electric accent along the top edge of framed panels */
+  .bl-panel {
+    position: relative;
+  }
+  .bl-panel::before {
+    content: "";
+    position: absolute;
+    left: 12px;
+    right: 26px;
+    top: 0;
+    height: 2px;
+    background: linear-gradient(90deg, rgba(91, 144, 255, 0.9), rgba(41, 211, 238, 0.3), transparent);
+    pointer-events: none;
+  }
+
+  /* clipped-corner surface, Blue Lock UI style */
+  .bl-cut {
+    clip-path: polygon(
+      0 0,
+      calc(100% - 14px) 0,
+      100% 14px,
+      100% 100%,
+      14px 100%,
+      0 calc(100% - 14px)
+    );
+  }
+
+  .bl-label {
+    font-family: var(--font-display);
+    text-transform: uppercase;
+    letter-spacing: 0.16em;
+    font-weight: 600;
+    font-size: 10px;
+    color: var(--color-zinc-400);
+  }
+
+  .bl-hair {
+    background-image: linear-gradient(90deg, rgba(93, 148, 255, 0.55), rgba(93, 148, 255, 0));
+    height: 2px;
+  }
+}
+
+@layer utilities {
+  @keyframes bl-rise {
+    from { opacity: 0; transform: translateY(12px); }
+    to { opacity: 1; transform: none; }
+  }
+  @keyframes bl-pulse {
+    0%, 100% { text-shadow: 0 0 12px rgba(93, 148, 255, 0.3); }
+    50% { text-shadow: 0 0 28px rgba(93, 148, 255, 0.8); }
+  }
+  @keyframes bl-sweep {
+    from { transform: translateX(-140%); }
+    to { transform: translateX(340%); }
+  }
+  @keyframes bl-scan {
+    from { background-position: 0 0; }
+    to { background-position: 0 -14px; }
+  }
+  .anim-rise { animation: bl-rise 0.5s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
+  .anim-pulse { animation: bl-pulse 3.2s ease-in-out infinite; }
+  .anim-sweep::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(100deg, transparent, rgba(255, 255, 255, 0.18), transparent);
+    transform: translateX(-140%);
+    animation: bl-sweep 2.8s ease-in-out infinite;
+  }
+  .glow-blue { box-shadow: var(--bl-glow); }
+  .text-glow { text-shadow: 0 0 20px rgba(93, 148, 255, 0.55); }
+
+  @media (prefers-reduced-motion: reduce) {
+    .anim-rise, .anim-pulse, .anim-sweep::after { animation: none; }
+  }
+}

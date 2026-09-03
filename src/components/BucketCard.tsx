@@ -58,7 +58,7 @@ export const BucketCard: React.FC<BucketCardProps> = ({
       !bucket.isFixed && !isExceeded && spentRatio > monthProgressRatio + 0.15 && spent > 0;
 
     return (
-      <div className="bg-zinc-900/90 border border-zinc-800 rounded-xl p-4 flex flex-col justify-between hover:border-zinc-700 transition-all group relative">
+      <div className="bl-panel bl-cut bg-zinc-900/80 border border-zinc-800 rounded-xl p-3.5 flex flex-col justify-between hover:border-emerald-500/40 transition-all group relative">
         <div>
           {/* Header row */}
           <div className="flex items-start justify-between">
@@ -208,7 +208,7 @@ export const BucketCard: React.FC<BucketCardProps> = ({
   const isGoalReached = current >= target && target > 0;
 
   return (
-    <div className="bg-zinc-900/90 border border-zinc-800 rounded-xl p-4 flex flex-col justify-between hover:border-zinc-700 transition-all group relative">
+    <div className="bl-panel bl-cut bg-zinc-900/80 border border-zinc-800 rounded-xl p-3.5 flex flex-col justify-between hover:border-emerald-500/40 transition-all group relative">
       <div>
         {/* Header row */}
         <div className="flex items-start justify-between">

@@ -1,29 +1,13 @@
 import React from 'react';
-import { 
-  Wallet, 
-  Plus, 
-  Upload, 
-  FileText, 
-  History, 
-  Tag, 
-  HardDrive, 
-  Download, 
-  Calendar,
-  Lock,
-  CheckCircle2
-} from 'lucide-react';
+import { Plus, History, FileText, ChevronDown } from 'lucide-react';
 
 interface HeaderProps {
   currentMonth: string;
   onMonthChange: (month: string) => void;
   availableMonths: string[];
   onOpenAddExpense: () => void;
-  onOpenCsvImport: () => void;
   onOpenWeeklyDigest: () => void;
   onOpenHistory: () => void;
-  onOpenRules: () => void;
-  onOpenStorageManager: () => void;
-  onOpenExport: () => void;
   syncButton?: React.ReactNode;
 }
 
@@ -32,151 +16,80 @@ export const Header: React.FC<HeaderProps> = ({
   onMonthChange,
   availableMonths,
   onOpenAddExpense,
-  onOpenCsvImport,
   onOpenWeeklyDigest,
   onOpenHistory,
-  onOpenRules,
-  onOpenStorageManager,
-  onOpenExport,
   syncButton,
 }) => {
   const now = new Date();
   const thisMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-
-  const formatMonthDisplay = (m: string) => {
-    const [year, month] = m.split('-').map(Number);
-    const date = new Date(year, month - 1, 1);
-    return date.toLocaleString('en-US', { month: 'short', year: 'numeric' });
+  const fmt = (m: string) => {
+    const [y, mm] = m.split('-').map(Number);
+    return new Date(y, mm - 1, 1).toLocaleString('en-US', { month: 'short', year: 'numeric' });
   };
 
   return (
-    <header className="bg-zinc-950 border-b border-zinc-800 sticky top-0 z-30 px-4 lg:px-8 py-3.5">
-      <div className="max-w-7xl mx-auto flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-        {/* Brand & Context */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400 font-bold shadow-inner">
-              <Wallet className="w-5 h-5" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h1 className="text-base font-bold text-zinc-100 tracking-tight">
-                  Personal Finance Manager
-                </h1>
-                <span className="text-[11px] font-mono font-medium px-2 py-0.5 rounded bg-zinc-900 border border-zinc-700/60 text-zinc-300">
-                  Envelope System
-                </span>
-              </div>
-              <div className="flex items-center gap-2 text-xs text-zinc-400 mt-0.5">
-                <span className="flex items-center gap-1 font-mono text-zinc-400">
-                  <Lock className="w-3 h-3 text-zinc-400" />
-                  Envelope budgeting
-                </span>
-                <span>•</span>
-                <button
-                  type="button"
-                  onClick={onOpenStorageManager}
-                  className="flex items-center gap-1.5 hover:text-emerald-400 transition-colors cursor-pointer"
-                  title="Zero-Config Local Storage & Auto-Backup Manager"
-                >
-                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                  <span className="text-emerald-400 font-mono text-[11px]">Local-First (0 Config)</span>
-                </button>
-              </div>
-            </div>
+    <header className="shrink-0 relative z-20 border-b border-zinc-800 bg-zinc-950/80 backdrop-blur px-3 sm:px-5 py-2.5">
+      <div className="flex items-center justify-between gap-3">
+        {/* Brand */}
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="relative w-9 h-9 shrink-0 bl-cut bg-gradient-to-br from-emerald-500 to-cyan-500 flex items-center justify-center">
+            <span className="font-display font-bold text-zinc-950 text-lg leading-none">BL</span>
+          </div>
+          <div className="min-w-0">
+            <h1 className="font-display font-bold text-[15px] tracking-[0.12em] text-white uppercase leading-none">
+              Blue<span className="text-emerald-400">Lock</span> Ledger
+            </h1>
+            <div className="bl-label mt-1 text-zinc-500">Egoist Budget System</div>
           </div>
         </div>
 
-        {/* Action Controls & Navigation */}
-        <div className="flex flex-wrap items-center gap-2">
-          {/* Month Selector */}
-          <div className="flex items-center bg-zinc-900 border border-zinc-800 rounded-lg px-2.5 py-1.5 text-xs text-zinc-200">
-            <Calendar className="w-3.5 h-3.5 text-zinc-400 mr-2" />
+        {/* Controls */}
+        <div className="flex items-center gap-2">
+          {/* Month selector */}
+          <div className="relative flex items-center bl-cut bg-zinc-900 border border-zinc-800 pl-3 pr-2 py-1.5 text-xs">
             <select
               value={currentMonth}
               onChange={(e) => onMonthChange(e.target.value)}
-              aria-label="Select Budget Month"
-              className="bg-transparent border-none text-zinc-200 font-medium focus:outline-none cursor-pointer pr-1"
+              aria-label="Budget month"
+              className="appearance-none bg-transparent text-zinc-200 font-display font-medium tracking-wide focus:outline-none cursor-pointer pr-4"
             >
               {availableMonths.map((m) => (
-                <option key={m} value={m} className="bg-zinc-900 text-zinc-200">
-                  {formatMonthDisplay(m)} {m === thisMonth ? '(Current)' : ''}
+                <option key={m} value={m} className="bg-zinc-900">
+                  {fmt(m)} {m === thisMonth ? '· NOW' : ''}
                 </option>
               ))}
             </select>
+            <ChevronDown className="w-3.5 h-3.5 text-zinc-500 absolute right-2 pointer-events-none" />
           </div>
 
-          {/* Quick Action Navigation */}
           <button
             type="button"
             onClick={onOpenHistory}
-            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium text-zinc-300 bg-zinc-900 border border-zinc-800 hover:bg-zinc-800/80 hover:text-white transition-colors cursor-pointer"
-            title="Side-by-side monthly history and trend charts"
+            className="hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 bl-cut text-xs font-medium text-zinc-300 bg-zinc-900 border border-zinc-800 hover:border-emerald-500/40 hover:text-white transition-colors cursor-pointer"
+            title="Monthly history"
           >
             <History className="w-3.5 h-3.5 text-indigo-400" />
-            <span>History</span>
+            <span className="hidden md:inline">History</span>
           </button>
-
           <button
             type="button"
             onClick={onOpenWeeklyDigest}
-            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium text-zinc-300 bg-zinc-900 border border-zinc-800 hover:bg-zinc-800/80 hover:text-white transition-colors cursor-pointer"
-            title="View rule-based weekly financial briefing"
+            className="hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 bl-cut text-xs font-medium text-zinc-300 bg-zinc-900 border border-zinc-800 hover:border-emerald-500/40 hover:text-white transition-colors cursor-pointer"
+            title="Weekly digest"
           >
             <FileText className="w-3.5 h-3.5 text-purple-400" />
-            <span>Digest</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={onOpenRules}
-            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium text-zinc-300 bg-zinc-900 border border-zinc-800 hover:bg-zinc-800/80 hover:text-white transition-colors cursor-pointer"
-            title="Manage CSV keyword-to-bucket auto-rules"
-          >
-            <Tag className="w-3.5 h-3.5 text-cyan-400" />
-            <span>Rules</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={onOpenCsvImport}
-            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium text-zinc-300 bg-zinc-900 border border-zinc-800 hover:bg-zinc-800/80 hover:text-white transition-colors cursor-pointer"
-            title="Import bank statement CSV with auto-categorization"
-          >
-            <Upload className="w-3.5 h-3.5 text-amber-400" />
-            <span>Import CSV</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={onOpenExport}
-            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium text-zinc-300 bg-zinc-900 border border-zinc-800 hover:bg-zinc-800/80 hover:text-white transition-colors cursor-pointer"
-            title="Export CSV or JSON backup"
-          >
-            <Download className="w-3.5 h-3.5 text-zinc-400" />
-            <span>Export</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={onOpenStorageManager}
-            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium text-zinc-300 bg-zinc-900 border border-zinc-800 hover:bg-zinc-800/80 hover:text-white transition-colors cursor-pointer"
-            title="Zero-Config Local Storage & Auto-Backup"
-          >
-            <HardDrive className="w-3.5 h-3.5 text-emerald-400" />
-            <span>Storage & Sync</span>
+            <span className="hidden md:inline">Digest</span>
           </button>
 
           {syncButton}
 
-          {/* Primary Action */}
           <button
             type="button"
             onClick={onOpenAddExpense}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-zinc-950 bg-emerald-400 hover:bg-emerald-300 transition-colors shadow-sm cursor-pointer ml-1"
+            className="flex items-center gap-1.5 px-3 py-1.5 bl-cut text-xs font-bold uppercase tracking-wider text-zinc-950 bg-gradient-to-r from-emerald-400 to-cyan-400 hover:from-emerald-300 hover:to-cyan-300 transition-colors cursor-pointer glow-blue"
           >
             <Plus className="w-4 h-4" />
-            <span>Log Transaction</span>
+            <span>Log</span>
           </button>
         </div>
       </div>

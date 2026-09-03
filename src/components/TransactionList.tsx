@@ -60,17 +60,12 @@ export const TransactionList: React.FC<TransactionListProps> = ({
   const sorted = [...filtered].sort((a, b) => b.date.localeCompare(a.date));
 
   return (
-    <div className="bg-zinc-900/80 border border-zinc-800 rounded-xl p-4 space-y-3.5">
+    <div className="bl-panel bl-cut bg-zinc-900/40 border border-zinc-800 rounded-2xl p-3.5 space-y-3">
       {/* Table Header & Controls */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
         <div className="flex items-center gap-2">
-          <Receipt className="w-4 h-4 text-emerald-400" />
-          <h2 className="text-sm font-bold text-zinc-100 tracking-tight">
-            Transaction Activity
-          </h2>
-          <span className="text-xs font-mono text-zinc-400">
-            ({sorted.length} recorded)
-          </span>
+          <Receipt className="w-3.5 h-3.5 text-emerald-400" />
+          <span className="bl-label text-emerald-400">Match Log ({sorted.length})</span>
         </div>
 
         {/* Filter Toolbar */}

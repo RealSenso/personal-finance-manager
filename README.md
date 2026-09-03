@@ -15,7 +15,8 @@ with optional Firebase sign-in for active multi-device sync.
   until you settle.
 - **Backdated entries** — add expenses for any date; every number recalculates and the view
   jumps to that month.
-- Savings-goal ETAs, bank-CSV import with keyword rules, weekly digest, monthly history.
+- Savings-goal ETAs, weekly digest, monthly history.
+- Single-viewport "cockpit" UI (Blue Lock themed) — the page never scrolls, only panels do.
 
 ## Run locally
 
