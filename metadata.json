@@ -1,0 +1,6 @@
+{
+  "name": "Personal Finance Manager",
+  "description": "Envelope budgeting and personal finance dashboard with recurring buckets, savings goals, bank CSV auto-categorization, rule-based insights, and monthly history.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
