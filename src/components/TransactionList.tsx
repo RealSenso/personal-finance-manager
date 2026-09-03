@@ -1,18 +1,18 @@
-import React, { useState } from 'react';
-import { 
-  Receipt, 
-  Search, 
-  Trash2, 
-  FileSpreadsheet, 
-  User, 
-  ArrowDownLeft, 
+import React, { useState } from "react";
+import {
+  Receipt,
+  Search,
+  Trash2,
+  FileSpreadsheet,
+  User,
+  ArrowDownLeft,
   ArrowUpRight,
   Filter,
   Calendar,
-  HandCoins
-} from 'lucide-react';
-import { Bucket, Transaction } from '../types';
-import { formatCurrency } from '../lib/insights';
+  HandCoins,
+} from "lucide-react";
+import { Bucket, Transaction } from "../types";
+import { formatCurrency } from "../lib/insights";
 
 interface TransactionListProps {
   transactions: Transaction[];
@@ -27,10 +27,12 @@ export const TransactionList: React.FC<TransactionListProps> = ({
   currentMonth,
   onDeleteTransaction,
 }) => {
-  const [searchTerm, setSearchTerm] = useState('');
-  const [selectedBucketFilter, setSelectedBucketFilter] = useState<string>('all');
-  const [selectedTypeFilter, setSelectedTypeFilter] = useState<string>('all');
-  const [showCurrentMonthOnly, setShowCurrentMonthOnly] = useState<boolean>(true);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [selectedBucketFilter, setSelectedBucketFilter] =
+    useState<string>("all");
+  const [selectedTypeFilter, setSelectedTypeFilter] = useState<string>("all");
+  const [showCurrentMonthOnly, setShowCurrentMonthOnly] =
+    useState<boolean>(true);
 
   const bucketMap = new Map<string, Bucket>(buckets.map((b) => [b.id, b]));
 
@@ -38,17 +40,17 @@ export const TransactionList: React.FC<TransactionListProps> = ({
     if (showCurrentMonthOnly && !t.date.startsWith(currentMonth)) {
       return false;
     }
-    if (selectedBucketFilter !== 'all' && t.bucketId !== selectedBucketFilter) {
+    if (selectedBucketFilter !== "all" && t.bucketId !== selectedBucketFilter) {
       return false;
     }
-    if (selectedTypeFilter !== 'all' && t.type !== selectedTypeFilter) {
+    if (selectedTypeFilter !== "all" && t.type !== selectedTypeFilter) {
       return false;
     }
     if (searchTerm) {
       const q = searchTerm.toLowerCase();
-      const matchNote = (t.note || '').toLowerCase().includes(q);
-      const matchMerchant = (t.merchant || '').toLowerCase().includes(q);
-      const bucketName = bucketMap.get(t.bucketId)?.name.toLowerCase() || '';
+      const matchNote = (t.note || "").toLowerCase().includes(q);
+      const matchMerchant = (t.merchant || "").toLowerCase().includes(q);
+      const bucketName = bucketMap.get(t.bucketId)?.name.toLowerCase() || "";
       if (!matchNote && !matchMerchant && !bucketName.includes(q)) {
         return false;
       }
@@ -60,12 +62,14 @@ export const TransactionList: React.FC<TransactionListProps> = ({
   const sorted = [...filtered].sort((a, b) => b.date.localeCompare(a.date));
 
   return (
-    <div className="bl-panel bl-cut bg-zinc-900/40 border border-zinc-800 rounded-2xl p-3.5 space-y-3">
+    <div className="m-panel bg-zinc-900/40 border border-zinc-800 rounded-2xl p-3.5 space-y-3">
       {/* Table Header & Controls */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
         <div className="flex items-center gap-2">
           <Receipt className="w-3.5 h-3.5 text-emerald-400" />
-          <span className="bl-label text-emerald-400">Match Log ({sorted.length})</span>
+          <span className="m-label text-emerald-300">
+            Ledger ({sorted.length})
+          </span>
         </div>
 
         {/* Filter Toolbar */}
@@ -102,11 +106,11 @@ export const TransactionList: React.FC<TransactionListProps> = ({
             onClick={() => setShowCurrentMonthOnly(!showCurrentMonthOnly)}
             className={`px-2.5 py-1.5 rounded-lg text-xs font-medium border transition-colors cursor-pointer ${
               showCurrentMonthOnly
-                ? 'bg-zinc-800 border-zinc-700 text-zinc-200'
-                : 'bg-zinc-950 border-zinc-800 text-zinc-400 hover:text-zinc-200'
+                ? "bg-zinc-800 border-zinc-700 text-zinc-200"
+                : "bg-zinc-950 border-zinc-800 text-zinc-400 hover:text-zinc-200"
             }`}
           >
-            {showCurrentMonthOnly ? 'Current Month' : 'All Time'}
+            {showCurrentMonthOnly ? "Current Month" : "All Time"}
           </button>
         </div>
       </div>
@@ -127,37 +131,47 @@ export const TransactionList: React.FC<TransactionListProps> = ({
           <tbody className="divide-y divide-zinc-800/60 font-sans">
             {sorted.length === 0 ? (
               <tr>
-                <td colSpan={6} className="py-8 text-center text-zinc-500 text-xs">
+                <td
+                  colSpan={6}
+                  className="py-8 text-center text-zinc-500 text-xs"
+                >
                   No transactions found matching the selected filters.
                 </td>
               </tr>
             ) : (
               sorted.map((tx) => {
                 const bucket = bucketMap.get(tx.bucketId);
-                const isExpense = tx.type === 'expense';
+                const isExpense = tx.type === "expense";
                 return (
-                  <tr key={tx.id} className="hover:bg-zinc-800/40 transition-colors">
+                  <tr
+                    key={tx.id}
+                    className="hover:bg-zinc-800/40 transition-colors"
+                  >
                     <td className="py-2.5 px-3 font-mono text-zinc-400 whitespace-nowrap">
                       {tx.date}
                     </td>
                     <td className="py-2.5 px-3 font-medium text-zinc-200">
                       <div className="flex items-center gap-1.5 flex-wrap">
-                        <span>{tx.note || tx.merchant || 'Untitled Transaction'}</span>
-                        {tx.paidBy === 'other' && (
+                        <span>
+                          {tx.note || tx.merchant || "Untitled Transaction"}
+                        </span>
+                        {tx.paidBy === "other" && (
                           <span
                             className={`inline-flex items-center gap-1 text-[10px] font-mono px-1.5 py-0.5 rounded border ${
                               tx.settled
-                                ? 'bg-zinc-800 text-zinc-400 border-zinc-700/60'
-                                : 'bg-amber-500/10 text-amber-400 border-amber-500/25'
+                                ? "bg-zinc-800 text-zinc-400 border-zinc-700/60"
+                                : "bg-amber-500/10 text-amber-400 border-amber-500/25"
                             }`}
                             title={
                               tx.settled
-                                ? `Repaid to ${tx.counterparty || 'someone'}`
-                                : `You owe ${tx.counterparty || 'someone'}`
+                                ? `Repaid to ${tx.counterparty || "someone"}`
+                                : `You owe ${tx.counterparty || "someone"}`
                             }
                           >
                             <HandCoins className="w-2.5 h-2.5" />
-                            {tx.settled ? 'Repaid' : `Owe ${tx.counterparty || ''}`.trim()}
+                            {tx.settled
+                              ? "Repaid"
+                              : `Owe ${tx.counterparty || ""}`.trim()}
                           </span>
                         )}
                       </div>
@@ -184,11 +198,13 @@ export const TransactionList: React.FC<TransactionListProps> = ({
                           {bucket.name}
                         </span>
                       ) : (
-                        <span className="text-zinc-500 italic">Uncategorized</span>
+                        <span className="text-zinc-500 italic">
+                          Uncategorized
+                        </span>
                       )}
                     </td>
                     <td className="py-2.5 px-3 whitespace-nowrap">
-                      {tx.source === 'csv_import' ? (
+                      {tx.source === "csv_import" ? (
                         <span className="inline-flex items-center gap-1 text-[10px] font-mono px-1.5 py-0.5 rounded bg-zinc-800 text-amber-400 border border-zinc-700/60">
                           <FileSpreadsheet className="w-2.5 h-2.5" />
                           CSV

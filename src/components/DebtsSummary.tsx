@@ -1,7 +1,7 @@
-import React from 'react';
-import { HandCoins, Check } from 'lucide-react';
-import { Transaction } from '../types';
-import { formatCurrency } from '../lib/insights';
+import React from "react";
+import { HandCoins, Check } from "lucide-react";
+import { Transaction } from "../types";
+import { formatCurrency } from "../lib/insights";
 
 interface DebtsSummaryProps {
   transactions: Transaction[];
@@ -20,10 +20,10 @@ export const DebtsSummary: React.FC<DebtsSummaryProps> = ({
 }) => {
   const outstanding = transactions.filter(
     (t) =>
-      t.type === 'expense' &&
-      t.paidBy === 'other' &&
+      t.type === "expense" &&
+      t.paidBy === "other" &&
       !t.settled &&
-      !!t.counterparty
+      !!t.counterparty,
   );
 
   if (outstanding.length === 0) return null;
@@ -38,15 +38,17 @@ export const DebtsSummary: React.FC<DebtsSummaryProps> = ({
     byPerson.set(key, existing);
   }
 
-  const people = Array.from(byPerson.values()).sort((a, b) => b.total - a.total);
+  const people = Array.from(byPerson.values()).sort(
+    (a, b) => b.total - a.total,
+  );
   const grandTotal = people.reduce((s, p) => s + p.total, 0);
 
   return (
-    <div className="bl-panel bl-cut bg-zinc-900/60 border border-amber-500/30 rounded-2xl p-3.5 space-y-3">
+    <div className="m-panel bg-zinc-900/60 border border-amber-500/30 rounded-2xl p-3.5 space-y-3">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <HandCoins className="w-4 h-4 text-amber-400" />
-          <span className="bl-label text-amber-400">Debts — Money You Owe</span>
+          <span className="m-label text-amber-400">Debts — Money You Owe</span>
         </div>
         <span className="text-sm font-mono font-bold text-amber-400">
           {formatCurrency(grandTotal)}
@@ -64,7 +66,7 @@ export const DebtsSummary: React.FC<DebtsSummaryProps> = ({
                 {p.name}
               </div>
               <div className="text-[11px] text-zinc-500 font-mono">
-                {p.count} unsettled {p.count === 1 ? 'expense' : 'expenses'}
+                {p.count} unsettled {p.count === 1 ? "expense" : "expenses"}
               </div>
             </div>
             <div className="flex items-center gap-2 shrink-0">

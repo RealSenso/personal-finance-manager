@@ -1,15 +1,21 @@
-import { Bucket, Transaction, UserIncomeProfile, RuleInsight, WeeklyDigestData } from '../types';
-import { calculateDailyAllowance } from './dailyAllowance';
-import { optimizeSavingsDistribution } from './smartSavings';
+import {
+  Bucket,
+  Transaction,
+  UserIncomeProfile,
+  RuleInsight,
+  WeeklyDigestData,
+} from "../types";
+import { calculateDailyAllowance } from "./dailyAllowance";
+import { optimizeSavingsDistribution } from "./smartSavings";
 
 export function getDaysInMonth(year: number, monthIndex: number): number {
   return new Date(year, monthIndex + 1, 0).getDate();
 }
 
 export function formatCurrency(amount: number): string {
-  return new Intl.NumberFormat('en-IN', {
-    style: 'currency',
-    currency: 'INR',
+  return new Intl.NumberFormat("en-IN", {
+    style: "currency",
+    currency: "INR",
     maximumFractionDigits: 0,
   }).format(amount);
 }
@@ -18,14 +24,14 @@ export function formatCurrency(amount: number): string {
 export function getBucketSpendForMonth(
   bucketId: string,
   transactions: Transaction[],
-  monthStr: string
+  monthStr: string,
 ): number {
   return transactions
     .filter(
       (tx) =>
         tx.bucketId === bucketId &&
-        tx.type === 'expense' &&
-        tx.date.startsWith(monthStr)
+        tx.type === "expense" &&
+        tx.date.startsWith(monthStr),
     )
     .reduce((sum, tx) => sum + tx.amount, 0);
 }
@@ -34,14 +40,14 @@ export function getBucketSpendForMonth(
 export function getSavingsDepositsForMonth(
   bucketId: string,
   transactions: Transaction[],
-  monthStr: string
+  monthStr: string,
 ): number {
   return transactions
     .filter(
       (tx) =>
         tx.bucketId === bucketId &&
-        tx.type === 'savings_deposit' &&
-        tx.date.startsWith(monthStr)
+        tx.type === "savings_deposit" &&
+        tx.date.startsWith(monthStr),
     )
     .reduce((sum, tx) => sum + tx.amount, 0);
 }
@@ -49,10 +55,10 @@ export function getSavingsDepositsForMonth(
 // Calculate historical average monthly deposit rate for a savings goal
 export function calculateAverageMonthlyDepositRate(
   bucket: Bucket,
-  transactions: Transaction[]
+  transactions: Transaction[],
 ): number {
   const goalTxs = transactions.filter(
-    (tx) => tx.bucketId === bucket.id && tx.type === 'savings_deposit'
+    (tx) => tx.bucketId === bucket.id && tx.type === "savings_deposit",
   );
 
   if (goalTxs.length === 0) {
@@ -67,7 +73,10 @@ export function calculateAverageMonthlyDepositRate(
   });
 
   const monthsCount = Math.max(1, monthMap.size);
-  const totalDeposited = Array.from(monthMap.values()).reduce((a, b) => a + b, 0);
+  const totalDeposited = Array.from(monthMap.values()).reduce(
+    (a, b) => a + b,
+    0,
+  );
   const avgActual = totalDeposited / monthsCount;
 
   // Blend with planned monthly rate if available
@@ -80,7 +89,7 @@ export function calculateAverageMonthlyDepositRate(
 // Calculate ETA for a savings goal
 export function calculateSavingsETA(
   bucket: Bucket,
-  transactions: Transaction[]
+  transactions: Transaction[],
 ): {
   monthsRemaining: number;
   estimatedDateStr: string;
@@ -93,19 +102,22 @@ export function calculateSavingsETA(
   if (target <= 0) {
     return {
       monthsRemaining: 0,
-      estimatedDateStr: 'Target not set',
+      estimatedDateStr: "Target not set",
       monthlyDepositRate: bucket.plannedMonthly,
       percentageComplete: 100,
     };
   }
 
-  const percentageComplete = Math.min(100, Math.round((current / target) * 100));
+  const percentageComplete = Math.min(
+    100,
+    Math.round((current / target) * 100),
+  );
   const remaining = Math.max(0, target - current);
 
   if (remaining === 0) {
     return {
       monthsRemaining: 0,
-      estimatedDateStr: 'Goal Achieved! 🎉',
+      estimatedDateStr: "Goal Achieved! 🎉",
       monthlyDepositRate: bucket.plannedMonthly,
       percentageComplete: 100,
     };
@@ -116,7 +128,7 @@ export function calculateSavingsETA(
   if (monthlyRate <= 0) {
     return {
       monthsRemaining: 999,
-      estimatedDateStr: 'Indefinite (₹0/mo deposit)',
+      estimatedDateStr: "Indefinite (₹0/mo deposit)",
       monthlyDepositRate: 0,
       percentageComplete,
     };
@@ -127,7 +139,7 @@ export function calculateSavingsETA(
   const futureDate = new Date(today);
   futureDate.setMonth(today.getMonth() + Math.ceil(monthsRemaining));
 
-  const monthName = futureDate.toLocaleString('en-US', { month: 'short' });
+  const monthName = futureDate.toLocaleString("en-US", { month: "short" });
   const year = futureDate.getFullYear();
 
   return {
@@ -143,12 +155,12 @@ export function evaluateFinancialInsights(
   buckets: Bucket[],
   transactions: Transaction[],
   incomeProfile: UserIncomeProfile,
-  currentDate: Date = new Date()
+  currentDate: Date = new Date(),
 ): RuleInsight[] {
   const insights: RuleInsight[] = [];
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth(); // 0-indexed
-  const monthStr = `${year}-${String(month + 1).padStart(2, '0')}`;
+  const monthStr = `${year}-${String(month + 1).padStart(2, "0")}`;
   const dayOfMonth = currentDate.getDate();
   const totalDaysInMonth = getDaysInMonth(year, month);
   const monthProgressRatio = dayOfMonth / totalDaysInMonth;
@@ -157,7 +169,9 @@ export function evaluateFinancialInsights(
   // 1. RULE: Mid-month pacing for flexible (non-fixed) recurring envelopes.
   // Fixed bills (subscriptions, rent, recharge) are meant to be paid in full early in
   // the month, so they only warn when they actually exceed their planned amount.
-  const recurringBuckets = buckets.filter((b) => b.type === 'recurring' && !b.isArchived);
+  const recurringBuckets = buckets.filter(
+    (b) => b.type === "recurring" && !b.isArchived,
+  );
   for (const bucket of recurringBuckets) {
     const spent = getBucketSpendForMonth(bucket.id, transactions, monthStr);
     const planned = bucket.plannedMonthly;
@@ -169,13 +183,13 @@ export function evaluateFinancialInsights(
       const overBy = spent - planned;
       insights.push({
         id: `ins-over-${bucket.id}`,
-        type: 'alert',
+        type: "alert",
         bucketId: bucket.id,
         title: `${bucket.name} Budget Exceeded`,
         message: `You've spent ${formatCurrency(spent)} of your planned ${formatCurrency(planned)} (${spendPercent}%), exceeding it by ${formatCurrency(overBy)} with ${totalDaysInMonth - dayOfMonth} days left.`,
         metric: `${spendPercent}% used`,
-        actionText: 'View Transactions',
-        actionType: 'view_bucket',
+        actionText: "View Transactions",
+        actionType: "view_bucket",
       });
       continue;
     }
@@ -183,22 +197,26 @@ export function evaluateFinancialInsights(
     if (bucket.isFixed) continue; // fixed bill, still within plan — nothing to flag
 
     if (spent > 0 && spent / planned > monthProgressRatio + 0.15) {
-      const projectedSpend = Math.round((spent / dayOfMonth) * totalDaysInMonth);
+      const projectedSpend = Math.round(
+        (spent / dayOfMonth) * totalDaysInMonth,
+      );
       insights.push({
         id: `ins-pace-${bucket.id}`,
-        type: 'warning',
+        type: "warning",
         bucketId: bucket.id,
         title: `${bucket.name} Running Hot`,
         message: `You've used ${spendPercent}% of this envelope (${formatCurrency(spent)} / ${formatCurrency(planned)}) but only ${monthProgressPercent}% of the month has passed (Day ${dayOfMonth}/${totalDaysInMonth}). At this rate you'd finish the month at ${formatCurrency(projectedSpend)}.`,
         metric: `Burn: ${spendPercent}% vs ${monthProgressPercent}% day`,
-        actionText: 'Review Bucket',
-        actionType: 'view_bucket',
+        actionText: "Review Bucket",
+        actionType: "view_bucket",
       });
     }
   }
 
   // 3. RULE: Savings Goal ETA & Milestone Updates
-  const savingsGoals = buckets.filter((b) => b.type === 'savings_goal' && !b.isArchived);
+  const savingsGoals = buckets.filter(
+    (b) => b.type === "savings_goal" && !b.isArchived,
+  );
   for (const goal of savingsGoals) {
     const eta = calculateSavingsETA(goal, transactions);
     const target = goal.targetAmount || 0;
@@ -208,24 +226,24 @@ export function evaluateFinancialInsights(
     if (current >= target && target > 0) {
       insights.push({
         id: `ins-goal-reached-${goal.id}`,
-        type: 'success',
+        type: "success",
         bucketId: goal.id,
         title: `${goal.name} Target Reached!`,
         message: `Congratulations! You've fully funded ${goal.name} with ${formatCurrency(current)} of ${formatCurrency(target)}. You are ready to execute on this goal.`,
-        metric: '100% Funded',
-        actionText: 'View Goal',
-        actionType: 'view_bucket',
+        metric: "100% Funded",
+        actionText: "View Goal",
+        actionType: "view_bucket",
       });
     } else if (eta.monthsRemaining > 0 && eta.monthsRemaining <= 6) {
       insights.push({
         id: `ins-goal-eta-${goal.id}`,
-        type: 'info',
+        type: "info",
         bucketId: goal.id,
         title: `${goal.name} Milestone in Reach`,
         message: `${goal.name} is ${eta.percentageComplete}% funded (${formatCurrency(current)} / ${formatCurrency(target)}). At your average savings rate of ${formatCurrency(eta.monthlyDepositRate)}/mo, you will reach this goal by ${eta.estimatedDateStr}.`,
         metric: `ETA: ${eta.estimatedDateStr}`,
-        actionText: 'Deposit Extra',
-        actionType: 'deposit',
+        actionText: "Deposit Extra",
+        actionType: "deposit",
         targetBucketId: goal.id,
       });
     }
@@ -235,8 +253,8 @@ export function evaluateFinancialInsights(
   // Check if a recurring bucket had 0 or negligible spend for past 2 consecutive months
   const prevMonth1 = new Date(year, month - 1, 1);
   const prevMonth2 = new Date(year, month - 2, 1);
-  const m1Str = `${prevMonth1.getFullYear()}-${String(prevMonth1.getMonth() + 1).padStart(2, '0')}`;
-  const m2Str = `${prevMonth2.getFullYear()}-${String(prevMonth2.getMonth() + 2).padStart(2, '0')}`;
+  const m1Str = `${prevMonth1.getFullYear()}-${String(prevMonth1.getMonth() + 1).padStart(2, "0")}`;
+  const m2Str = `${prevMonth2.getFullYear()}-${String(prevMonth2.getMonth() + 2).padStart(2, "0")}`;
 
   for (const bucket of recurringBuckets) {
     if (!bucket.isFixed && bucket.plannedMonthly >= 1000) {
@@ -248,17 +266,19 @@ export function evaluateFinancialInsights(
       if (totalIdleSpend < bucket.plannedMonthly * 0.2) {
         const potentialIdleAmount = bucket.plannedMonthly * 2 - totalIdleSpend;
         const targetSavingsGoal = savingsGoals[0]; // e.g. Hostel Fund or Gadget Fund
-        const targetName = targetSavingsGoal ? targetSavingsGoal.name : 'your savings goals';
+        const targetName = targetSavingsGoal
+          ? targetSavingsGoal.name
+          : "your savings goals";
 
         insights.push({
           id: `ins-idle-${bucket.id}`,
-          type: 'recommendation',
+          type: "recommendation",
           bucketId: bucket.id,
           title: `Idle Balance Detected in ${bucket.name}`,
-          message: `'${bucket.name}' has had virtually zero activity over the past 2 months (${formatCurrency(totalIdleSpend)} spent across ${prevMonth2.toLocaleString('en-US', { month: 'short' })} and ${prevMonth1.toLocaleString('en-US', { month: 'short' })}). You have ~${formatCurrency(potentialIdleAmount)} sitting idle. Consider reallocating part of this to ${targetName}.`,
+          message: `'${bucket.name}' has had virtually zero activity over the past 2 months (${formatCurrency(totalIdleSpend)} spent across ${prevMonth2.toLocaleString("en-US", { month: "short" })} and ${prevMonth1.toLocaleString("en-US", { month: "short" })}). You have ~${formatCurrency(potentialIdleAmount)} sitting idle. Consider reallocating part of this to ${targetName}.`,
           metric: `${formatCurrency(potentialIdleAmount)} idle`,
           actionText: `Reallocate to ${targetName}`,
-          actionType: 'reallocate',
+          actionType: "reallocate",
           targetBucketId: targetSavingsGoal?.id,
         });
       }
@@ -267,62 +287,79 @@ export function evaluateFinancialInsights(
 
   // 5. RULE: Smart daily spending allowance
   //    (income − savings reserve − goal deposits − fixed bills, over remaining days).
-  const da = calculateDailyAllowance(buckets, transactions, incomeProfile, monthStr, currentDate);
+  const da = calculateDailyAllowance(
+    buckets,
+    transactions,
+    incomeProfile,
+    monthStr,
+    currentDate,
+  );
   if (da.monthlySpendable <= 0 && da.totalReserved > 0) {
     insights.push({
-      id: 'ins-no-spendable',
-      type: 'alert',
-      title: 'Nothing Left to Spend This Month',
+      id: "ins-no-spendable",
+      type: "alert",
+      title: "Nothing Left to Spend This Month",
       message: `Your reservations (${formatCurrency(da.savingsReserve)} savings + ${formatCurrency(da.goalCommitments)} goal deposits + ${formatCurrency(da.fixedCommitments)} fixed bills = ${formatCurrency(da.totalReserved)}) meet or exceed your ${formatCurrency(da.totalIncome)} income. Lower your savings rate or a goal's monthly deposit to free up day-to-day money.`,
       metric: `${formatCurrency(da.totalReserved)} reserved`,
-      actionText: 'Adjust',
-      actionType: 'adjust_budget',
+      actionText: "Adjust",
+      actionType: "adjust_budget",
     });
-  } else if (da.todayStatus === 'exceeded') {
+  } else if (da.todayStatus === "exceeded") {
     insights.push({
-      id: 'ins-daily-allowance-exceeded',
-      type: 'alert',
-      title: 'Over Your Daily Allowance Today',
+      id: "ins-daily-allowance-exceeded",
+      type: "alert",
+      title: "Over Your Daily Allowance Today",
       message: `You've spent ${formatCurrency(da.todaySpent)} today against a safe target of ${formatCurrency(da.safeDailyAllowance)}/day. Tomorrow's allowance drops to keep you inside this month's ${formatCurrency(da.monthlySpendable)} spendable budget.`,
       metric: `${formatCurrency(da.todaySpent)} spent today`,
     });
   } else if (da.safeDailyAllowance > 0 && da.remainingDays > 3) {
     insights.push({
-      id: 'ins-daily-allowance-on-track',
-      type: 'info',
-      title: 'Daily Spending Allowance',
+      id: "ins-daily-allowance-on-track",
+      type: "info",
+      title: "Daily Spending Allowance",
       message: `After setting aside ${formatCurrency(da.savingsReserve)} savings, ${formatCurrency(da.goalCommitments)} goal deposits and ${formatCurrency(da.fixedCommitments)} fixed bills, ${formatCurrency(da.remainingSpendable)} is left to spend over ${da.remainingDays} days — about ${formatCurrency(da.safeDailyAllowance)}/day. ${formatCurrency(Math.max(0, da.todayRemaining))} left for today.`,
       metric: `${formatCurrency(da.safeDailyAllowance)}/day safe`,
     });
   }
 
   // 5b. RULE: Underspend surplus is ready to move to goals.
-  if (da.underspendPool >= 500 && savingsGoals.some((g) => g.currentBalance < (g.targetAmount || 0))) {
+  if (
+    da.underspendPool >= 500 &&
+    savingsGoals.some((g) => g.currentBalance < (g.targetAmount || 0))
+  ) {
     insights.push({
-      id: 'ins-sweep-underspend',
-      type: 'recommendation',
-      title: 'You Underspent — Move It to Your Goals',
+      id: "ins-sweep-underspend",
+      type: "recommendation",
+      title: "You Underspent — Move It to Your Goals",
       message: `You're ${formatCurrency(da.underspendPool)} under your day-to-day pace so far this month. Sweep it into your savings goals now so the surplus doesn't quietly leak back into spending.`,
       metric: `${formatCurrency(da.underspendPool)} to sweep`,
-      actionText: 'Sweep to Goals',
-      actionType: 'sweep_to_goals',
+      actionText: "Sweep to Goals",
+      actionType: "sweep_to_goals",
     });
   }
 
   // 6. RULE: Smart Savings Goal Acceleration & Multi-Goal Distribution
   if (savingsGoals.length > 1) {
-    const smartSavingsResult = optimizeSavingsDistribution(buckets, incomeProfile, 'balanced_accelerator', currentDate);
-    if (smartSavingsResult.cascadeTimelineSummary && smartSavingsResult.activeGoalsCount > 1) {
+    const smartSavingsResult = optimizeSavingsDistribution(
+      buckets,
+      incomeProfile,
+      "balanced_accelerator",
+      currentDate,
+    );
+    if (
+      smartSavingsResult.cascadeTimelineSummary &&
+      smartSavingsResult.activeGoalsCount > 1
+    ) {
       const topGoal = smartSavingsResult.allocations.find((a) => !a.isAchieved);
       if (topGoal && topGoal.monthsSavedVsEqualSplit > 0) {
         insights.push({
-          id: 'ins-smart-savings-accelerate',
-          type: 'recommendation',
+          id: "ins-smart-savings-accelerate",
+          type: "recommendation",
           title: `Smart Goal Acceleration: Buy ${topGoal.bucketName} Earlier`,
-          message: `With balanced acceleration, you can buy ${topGoal.bucketName} ~${topGoal.monthsSavedVsEqualSplit} months earlier (${topGoal.completionDateStr}) while still depositing ${formatCurrency(smartSavingsResult.allocations.find(a => a.bucketId !== topGoal.bucketId)?.recommendedMonthly || 0)}/mo into your other goals!`,
+          message: `With balanced acceleration, you can buy ${topGoal.bucketName} ~${topGoal.monthsSavedVsEqualSplit} months earlier (${topGoal.completionDateStr}) while still depositing ${formatCurrency(smartSavingsResult.allocations.find((a) => a.bucketId !== topGoal.bucketId)?.recommendedMonthly || 0)}/mo into your other goals!`,
           metric: `~${topGoal.monthsSavedVsEqualSplit} mos faster`,
-          actionText: 'Optimize Savings Goals',
-          actionType: 'open_smart_savings',
+          actionText: "Optimize Savings Goals",
+          actionType: "open_smart_savings",
         });
       }
     }
@@ -336,41 +373,57 @@ export function generateWeeklyDigest(
   buckets: Bucket[],
   transactions: Transaction[],
   incomeProfile: UserIncomeProfile,
-  currentDate: Date = new Date()
+  currentDate: Date = new Date(),
 ): WeeklyDigestData {
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth();
-  const monthStr = `${year}-${String(month + 1).padStart(2, '0')}`;
-  const monthName = currentDate.toLocaleString('en-US', { month: 'long', year: 'numeric' });
+  const monthStr = `${year}-${String(month + 1).padStart(2, "0")}`;
+  const monthName = currentDate.toLocaleString("en-US", {
+    month: "long",
+    year: "numeric",
+  });
   const dayOfMonth = currentDate.getDate();
   const totalDaysInMonth = getDaysInMonth(year, month);
   const weekNumber = Math.min(5, Math.ceil(dayOfMonth / 7));
-  const monthProgressPercent = Math.round((dayOfMonth / totalDaysInMonth) * 100);
+  const monthProgressPercent = Math.round(
+    (dayOfMonth / totalDaysInMonth) * 100,
+  );
 
   const totalIncome =
     incomeProfile.stipend +
     incomeProfile.extra +
     (incomeProfile.otherStreams || []).reduce((s, st) => s + st.amount, 0);
 
-  const recurringBuckets = buckets.filter((b) => b.type === 'recurring' && !b.isArchived);
-  const savingsGoals = buckets.filter((b) => b.type === 'savings_goal' && !b.isArchived);
+  const recurringBuckets = buckets.filter(
+    (b) => b.type === "recurring" && !b.isArchived,
+  );
+  const savingsGoals = buckets.filter(
+    (b) => b.type === "savings_goal" && !b.isArchived,
+  );
 
   // Month-to-date spending
   const totalSpent = transactions
-    .filter((tx) => tx.type === 'expense' && tx.date.startsWith(monthStr))
+    .filter((tx) => tx.type === "expense" && tx.date.startsWith(monthStr))
     .reduce((s, tx) => s + tx.amount, 0);
 
-  const totalRecurringBudget = recurringBuckets.reduce((s, b) => s + b.plannedMonthly, 0);
-  const spentPercent = totalRecurringBudget > 0 ? Math.round((totalSpent / totalRecurringBudget) * 100) : 0;
+  const totalRecurringBudget = recurringBuckets.reduce(
+    (s, b) => s + b.plannedMonthly,
+    0,
+  );
+  const spentPercent =
+    totalRecurringBudget > 0
+      ? Math.round((totalSpent / totalRecurringBudget) * 100)
+      : 0;
 
-  const hotBuckets: WeeklyDigestData['hotBuckets'] = [];
-  const safeBuckets: WeeklyDigestData['safeBuckets'] = [];
+  const hotBuckets: WeeklyDigestData["hotBuckets"] = [];
+  const safeBuckets: WeeklyDigestData["safeBuckets"] = [];
 
   for (const bucket of recurringBuckets) {
     const spent = getBucketSpendForMonth(bucket.id, transactions, monthStr);
     const planned = bucket.plannedMonthly;
     const percent = planned > 0 ? Math.round((spent / planned) * 100) : 0;
-    const paceRatio = monthProgressPercent > 0 ? percent / monthProgressPercent : 1;
+    const paceRatio =
+      monthProgressPercent > 0 ? percent / monthProgressPercent : 1;
 
     if (percent > monthProgressPercent + 15 || percent >= 90) {
       hotBuckets.push({
@@ -391,43 +444,49 @@ export function generateWeeklyDigest(
   }
 
   // Savings highlights
-  const savingsHighlights: WeeklyDigestData['savingsHighlights'] = savingsGoals.map((g) => {
-    const eta = calculateSavingsETA(g, transactions);
-    return {
-      name: g.name,
-      current: g.currentBalance,
-      target: g.targetAmount || 0,
-      percent: eta.percentageComplete,
-      etaMonths: eta.monthsRemaining,
-    };
-  });
+  const savingsHighlights: WeeklyDigestData["savingsHighlights"] =
+    savingsGoals.map((g) => {
+      const eta = calculateSavingsETA(g, transactions);
+      return {
+        name: g.name,
+        current: g.currentBalance,
+        target: g.targetAmount || 0,
+        percent: eta.percentageComplete,
+        etaMonths: eta.monthsRemaining,
+      };
+    });
 
   // Determine overall status
-  let status: WeeklyDigestData['status'] = 'Healthy';
+  let status: WeeklyDigestData["status"] = "Healthy";
   if (hotBuckets.some((b) => b.percent > 100)) {
-    status = 'Attention Needed';
-  } else if (hotBuckets.length > 0 || spentPercent > monthProgressPercent + 20) {
-    status = 'Caution';
+    status = "Attention Needed";
+  } else if (
+    hotBuckets.length > 0 ||
+    spentPercent > monthProgressPercent + 20
+  ) {
+    status = "Caution";
   }
 
   // Build summary sentences via deterministic template logic
   const summarySentences: string[] = [];
   summarySentences.push(
-    `We are at Day ${dayOfMonth} of ${totalDaysInMonth} in ${monthName} (${monthProgressPercent}% of the month elapsed).`
+    `We are at Day ${dayOfMonth} of ${totalDaysInMonth} in ${monthName} (${monthProgressPercent}% of the month elapsed).`,
   );
 
   summarySentences.push(
-    `You have spent ${formatCurrency(totalSpent)} out of your ${formatCurrency(totalRecurringBudget)} monthly recurring budget (${spentPercent}% used).`
+    `You have spent ${formatCurrency(totalSpent)} out of your ${formatCurrency(totalRecurringBudget)} monthly recurring budget (${spentPercent}% used).`,
   );
 
   if (hotBuckets.length === 0) {
     summarySentences.push(
-      `All expense envelopes are currently tracking at or below the expected calendar pace. Your spending velocity is disciplined.`
+      `All expense envelopes are currently tracking at or below the expected calendar pace. Your spending velocity is disciplined.`,
     );
   } else {
-    const hotNames = hotBuckets.map((b) => `'${b.name}' (${b.percent}%)`).join(', ');
+    const hotNames = hotBuckets
+      .map((b) => `'${b.name}' (${b.percent}%)`)
+      .join(", ");
     summarySentences.push(
-      `Warning: ${hotBuckets.length} envelope${hotBuckets.length > 1 ? 's are' : ' is'} outpacing the calendar: ${hotNames}.`
+      `Warning: ${hotBuckets.length} envelope${hotBuckets.length > 1 ? "s are" : " is"} outpacing the calendar: ${hotNames}.`,
     );
   }
 
@@ -436,20 +495,27 @@ export function generateWeeklyDigest(
     const daysLeft = totalDaysInMonth - dayOfMonth;
     hotBuckets.forEach((b) => {
       const remainingAllowance = Math.max(0, b.planned - b.spent);
-      const dailyCap = daysLeft > 0 ? Math.floor(remainingAllowance / daysLeft) : 0;
+      const dailyCap =
+        daysLeft > 0 ? Math.floor(remainingAllowance / daysLeft) : 0;
       recommendations.push(
-        `Cap spending in '${b.name}' to ${formatCurrency(dailyCap)}/day for the remaining ${daysLeft} days to avoid a budget deficit.`
+        `Cap spending in '${b.name}' to ${formatCurrency(dailyCap)}/day for the remaining ${daysLeft} days to avoid a budget deficit.`,
       );
     });
   }
 
-  const da = calculateDailyAllowance(buckets, transactions, incomeProfile, monthStr, currentDate);
+  const da = calculateDailyAllowance(
+    buckets,
+    transactions,
+    incomeProfile,
+    monthStr,
+    currentDate,
+  );
   recommendations.push(
-    `Day-to-day budget: ${formatCurrency(da.safeDailyAllowance)}/day (${formatCurrency(da.remainingSpendable)} left for ${da.remainingDays} days) after ${formatCurrency(da.totalReserved)} reserved for savings, goal deposits and fixed bills.`
+    `Day-to-day budget: ${formatCurrency(da.safeDailyAllowance)}/day (${formatCurrency(da.remainingSpendable)} left for ${da.remainingDays} days) after ${formatCurrency(da.totalReserved)} reserved for savings, goal deposits and fixed bills.`,
   );
   if (da.underspendPool >= 500) {
     recommendations.push(
-      `You're ${formatCurrency(da.underspendPool)} under your spending pace — move it into your savings goals.`
+      `You're ${formatCurrency(da.underspendPool)} under your spending pace — move it into your savings goals.`,
     );
   }
 
@@ -457,16 +523,16 @@ export function generateWeeklyDigest(
     const eta = calculateSavingsETA(g, transactions);
     if (eta.percentageComplete >= 80 && eta.percentageComplete < 100) {
       recommendations.push(
-        `'${g.name}' is within striking distance (${eta.percentageComplete}%). An extra one-time deposit of ${formatCurrency((g.targetAmount || 0) - g.currentBalance)} completes this goal today!`
+        `'${g.name}' is within striking distance (${eta.percentageComplete}%). An extra one-time deposit of ${formatCurrency((g.targetAmount || 0) - g.currentBalance)} completes this goal today!`,
       );
     }
   });
 
   return {
-    generatedDate: currentDate.toLocaleDateString('en-IN', {
-      day: 'numeric',
-      month: 'short',
-      year: 'numeric',
+    generatedDate: currentDate.toLocaleDateString("en-IN", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
     }),
     monthName,
     weekNumber,

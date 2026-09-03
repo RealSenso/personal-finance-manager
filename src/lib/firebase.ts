@@ -1,8 +1,8 @@
 // Firebase is optional. When the VITE_FIREBASE_* env vars are absent the app stays
 // 100% local (localStorage only) and every export here is null / a no-op.
-import { initializeApp, type FirebaseApp } from 'firebase/app';
-import { getAuth, GoogleAuthProvider, type Auth } from 'firebase/auth';
-import { initializeFirestore, type Firestore } from 'firebase/firestore';
+import { initializeApp, type FirebaseApp } from "firebase/app";
+import { getAuth, GoogleAuthProvider, type Auth } from "firebase/auth";
+import { initializeFirestore, type Firestore } from "firebase/firestore";
 
 const cfg = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -13,7 +13,9 @@ const cfg = {
   appId: import.meta.env.VITE_FIREBASE_APP_ID,
 };
 
-export const firebaseEnabled = Boolean(cfg.apiKey && cfg.projectId && cfg.appId);
+export const firebaseEnabled = Boolean(
+  cfg.apiKey && cfg.projectId && cfg.appId,
+);
 
 let app: FirebaseApp | null = null;
 let auth: Auth | null = null;

@@ -1,13 +1,12 @@
-import { useState, useEffect, useMemo } from 'react';
-import { CheckCircle2, AlertCircle, Info, X } from 'lucide-react';
+import { useState, useEffect, useMemo, useRef } from "react";
+import { CheckCircle2, AlertCircle, Info, X, Undo2 } from "lucide-react";
 import {
   Bucket,
   Transaction,
-  KeywordRule,
   UserIncomeProfile,
   RuleInsight,
   TransactionType,
-} from './types';
+} from "./types";
 import {
   loadBuckets,
   saveBuckets,
@@ -15,33 +14,36 @@ import {
   saveTransactions,
   loadIncomeProfile,
   saveIncomeProfile,
-  loadKeywordRules,
-  saveKeywordRules,
   initStorageIfEmpty,
-} from './lib/storage';
-import { evaluateFinancialInsights, formatCurrency } from './lib/insights';
-import { calculateDailyAllowance } from './lib/dailyAllowance';
-import { useCloudSync } from './lib/useCloudSync';
-import type { AppSnapshot } from './types';
-import { SyncButton } from './components/SyncButton';
-import { Header } from './components/Header';
-import { DashboardStats } from './components/DashboardStats';
-import { DailyAllowanceWidget } from './components/DailyAllowanceWidget';
-import { InsightsBanner } from './components/InsightsBanner';
-import { BucketList } from './components/BucketList';
-import { TransactionList } from './components/TransactionList';
-import { DebtsSummary } from './components/DebtsSummary';
-import { AddExpenseModal } from './components/AddExpenseModal';
-import { MonthlyHistoryModal } from './components/MonthlyHistoryModal';
-import { WeeklyDigestModal } from './components/WeeklyDigestModal';
-import { BucketFormModal } from './components/BucketFormModal';
-import { ConfirmDeleteModal, ConfirmDeleteState } from './components/ConfirmDeleteModal';
-import { SmartSavingsModal } from './components/SmartSavingsModal';
+} from "./lib/storage";
+import { evaluateFinancialInsights, formatCurrency } from "./lib/insights";
+import { calculateDailyAllowance } from "./lib/dailyAllowance";
+import { useCloudSync } from "./lib/useCloudSync";
+import type { AppSnapshot } from "./types";
+import { SyncButton } from "./components/SyncButton";
+import { Header } from "./components/Header";
+import { DashboardStats } from "./components/DashboardStats";
+import { SpendingBreakdown } from "./components/SpendingBreakdown";
+import { DailyAllowanceWidget } from "./components/DailyAllowanceWidget";
+import { InsightsBanner } from "./components/InsightsBanner";
+import { BucketList } from "./components/BucketList";
+import { TransactionList } from "./components/TransactionList";
+import { DebtsSummary } from "./components/DebtsSummary";
+import { AddExpenseModal } from "./components/AddExpenseModal";
+import { MonthlyHistoryModal } from "./components/MonthlyHistoryModal";
+import { WeeklyDigestModal } from "./components/WeeklyDigestModal";
+import { BucketFormModal } from "./components/BucketFormModal";
+import {
+  ConfirmDeleteModal,
+  ConfirmDeleteState,
+} from "./components/ConfirmDeleteModal";
+import { SmartSavingsModal } from "./components/SmartSavingsModal";
 
 interface ToastNotice {
   id: string;
-  type: 'success' | 'info' | 'error';
+  type: "success" | "info" | "error";
   message: string;
+  action?: { label: string; run: () => void };
 }
 
 export default function App() {
@@ -49,21 +51,33 @@ export default function App() {
     initStorageIfEmpty();
   }, []);
 
-  const [incomeProfile, setIncomeProfile] = useState<UserIncomeProfile>(() => loadIncomeProfile());
+  const [incomeProfile, setIncomeProfile] = useState<UserIncomeProfile>(() =>
+    loadIncomeProfile(),
+  );
   const [buckets, setBuckets] = useState<Bucket[]>(() => loadBuckets());
-  const [transactions, setTransactions] = useState<Transaction[]>(() => loadTransactions());
-  const [keywordRules, setKeywordRules] = useState<KeywordRule[]>(() => loadKeywordRules());
+  const [transactions, setTransactions] = useState<Transaction[]>(() =>
+    loadTransactions(),
+  );
 
   const [toasts, setToasts] = useState<ToastNotice[]>([]);
-  const showToast = (message: string, type: 'success' | 'info' | 'error' = 'success') => {
-    const id = `toast-${Date.now()}-${Math.random().toString(36).substring(2, 5)}`;
-    setToasts((prev) => [...prev, { id, message, type }]);
-    setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== id)), 3500);
+  const showToast = (
+    message: string,
+    type: ToastNotice["type"] = "success",
+    action?: ToastNotice["action"],
+  ) => {
+    const id = `t-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`;
+    setToasts((p) => [...p, { id, message, type, action }]);
+    setTimeout(
+      () => setToasts((p) => p.filter((t) => t.id !== id)),
+      action ? 6000 : 3200,
+    );
   };
+  const dismissToast = (id: string) =>
+    setToasts((p) => p.filter((t) => t.id !== id));
 
   const thisMonth = useMemo(() => {
     const d = new Date();
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
   }, []);
   const [currentMonth, setCurrentMonth] = useState<string>(thisMonth);
 
@@ -75,38 +89,69 @@ export default function App() {
 
   // Modal state
   const [isAddExpenseOpen, setIsAddExpenseOpen] = useState(false);
-  const [expenseInitialBucketId, setExpenseInitialBucketId] = useState<string | undefined>();
-  const [expenseInitialType, setExpenseInitialType] = useState<TransactionType>('expense');
+  const [expenseInitialBucketId, setExpenseInitialBucketId] = useState<
+    string | undefined
+  >();
+  const [expenseInitialType, setExpenseInitialType] =
+    useState<TransactionType>("expense");
   const [isWeeklyDigestOpen, setIsWeeklyDigestOpen] = useState(false);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [isSmartSavingsOpen, setIsSmartSavingsOpen] = useState(false);
   const [isBucketFormOpen, setIsBucketFormOpen] = useState(false);
   const [bucketToEdit, setBucketToEdit] = useState<Bucket | null>(null);
-  const [confirmDeleteState, setConfirmDeleteState] = useState<ConfirmDeleteState>({
-    isOpen: false,
-    type: 'bucket',
-    title: '',
-    description: '',
-    itemId: '',
-  });
+  const [confirmDeleteState, setConfirmDeleteState] =
+    useState<ConfirmDeleteState>({
+      isOpen: false,
+      type: "bucket",
+      title: "",
+      description: "",
+      itemId: "",
+    });
 
-  const handleUpdateIncome = (newProfile: UserIncomeProfile) => {
-    setIncomeProfile(newProfile);
-    saveIncomeProfile(newProfile);
-    showToast('Income updated');
+  const anyModalOpen =
+    isAddExpenseOpen ||
+    isWeeklyDigestOpen ||
+    isHistoryOpen ||
+    isSmartSavingsOpen ||
+    isBucketFormOpen ||
+    confirmDeleteState.isOpen;
+  const anyModalOpenRef = useRef(anyModalOpen);
+  anyModalOpenRef.current = anyModalOpen;
+
+  const openAddExpense = () => {
+    setExpenseInitialBucketId(undefined);
+    setExpenseInitialType("expense");
+    setIsAddExpenseOpen(true);
   };
 
-  const handleSaveBucket = (bucketData: Omit<Bucket, 'id'>, bucketId?: string) => {
-    let updated: Bucket[];
-    if (bucketId) {
-      updated = buckets.map((b) => (b.id === bucketId ? { ...b, ...bucketData } : b));
-      showToast(`Updated "${bucketData.name}"`);
-    } else {
-      updated = [...buckets, { ...bucketData, id: `b-${Date.now()}` }];
-      showToast(`Created "${bucketData.name}"`);
-    }
+  // Keyboard: N opens the Log dialog
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key.toLowerCase() !== "n" || e.metaKey || e.ctrlKey || e.altKey)
+        return;
+      const el = document.activeElement as HTMLElement | null;
+      if (el && /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName)) return;
+      if (anyModalOpenRef.current) return;
+      e.preventDefault();
+      openAddExpense();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
+  const handleUpdateIncome = (p: UserIncomeProfile) => {
+    setIncomeProfile(p);
+    saveIncomeProfile(p);
+    showToast("Income updated");
+  };
+
+  const handleSaveBucket = (data: Omit<Bucket, "id">, bucketId?: string) => {
+    const updated = bucketId
+      ? buckets.map((b) => (b.id === bucketId ? { ...b, ...data } : b))
+      : [...buckets, { ...data, id: `b-${Date.now()}` }];
     setBuckets(updated);
     saveBuckets(updated);
+    showToast(bucketId ? `Updated "${data.name}"` : `Created "${data.name}"`);
   };
 
   const handleRequestDeleteBucket = (bucketId: string) => {
@@ -114,7 +159,7 @@ export default function App() {
     if (!bucket) return;
     setConfirmDeleteState({
       isOpen: true,
-      type: 'bucket',
+      type: "bucket",
       title: `Delete: ${bucket.name}`,
       description: `Delete "${bucket.name}"? Its past transactions stay in the ledger but become unassigned.`,
       itemId: bucketId,
@@ -123,95 +168,111 @@ export default function App() {
   };
 
   const handleExecuteConfirmedDelete = () => {
-    if (confirmDeleteState.type === 'bucket') {
-      const bucket = buckets.find((b) => b.id === confirmDeleteState.itemId);
-      const updated = buckets.filter((b) => b.id !== confirmDeleteState.itemId);
-      setBuckets(updated);
-      saveBuckets(updated);
-      showToast(`Deleted "${bucket?.name || 'envelope'}"`);
-    }
+    if (confirmDeleteState.type !== "bucket") return;
+    const bucket = buckets.find((b) => b.id === confirmDeleteState.itemId);
+    const updated = buckets.filter((b) => b.id !== confirmDeleteState.itemId);
+    setBuckets(updated);
+    saveBuckets(updated);
+    showToast(`Deleted "${bucket?.name || "envelope"}"`);
   };
 
-  const handleAddTransaction = (newTxData: Omit<Transaction, 'id' | 'createdAt'>) => {
-    const newTx: Transaction = {
-      ...newTxData,
-      id: `tx-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+  const commitTxs = (txs: Transaction[]) => {
+    setTransactions(txs);
+    saveTransactions(txs);
+  };
+  const commitBuckets = (bs: Bucket[]) => {
+    setBuckets(bs);
+    saveBuckets(bs);
+  };
+
+  const handleAddTransaction = (
+    data: Omit<Transaction, "id" | "createdAt">,
+  ) => {
+    const tx: Transaction = {
+      ...data,
+      id: `tx-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
       createdAt: new Date().toISOString(),
     };
-    const updatedTxs = [newTx, ...transactions];
-    setTransactions(updatedTxs);
-    saveTransactions(updatedTxs);
-
-    if (newTx.type === 'savings_deposit') {
-      const updatedBuckets = buckets.map((b) =>
-        b.id === newTx.bucketId && b.type === 'savings_goal'
-          ? { ...b, currentBalance: b.currentBalance + newTx.amount }
-          : b
+    commitTxs([tx, ...transactions]);
+    if (tx.type === "savings_deposit") {
+      commitBuckets(
+        buckets.map((b) =>
+          b.id === tx.bucketId && b.type === "savings_goal"
+            ? { ...b, currentBalance: b.currentBalance + tx.amount }
+            : b,
+        ),
       );
-      setBuckets(updatedBuckets);
-      saveBuckets(updatedBuckets);
-      showToast(`Deposited ${formatCurrency(newTx.amount)}`);
+      showToast(`Deposited ${formatCurrency(tx.amount)}`);
     } else {
-      showToast(`Logged ${formatCurrency(newTx.amount)}`);
+      showToast(`Logged ${formatCurrency(tx.amount)}`);
     }
-
-    const txMonth = newTx.date.slice(0, 7);
-    if (txMonth !== currentMonth) setCurrentMonth(txMonth);
+    const m = tx.date.slice(0, 7);
+    if (m !== currentMonth) setCurrentMonth(m);
   };
 
   const handleSweepToGoals = (amount: number) => {
     const sweep = Math.floor(amount);
     if (sweep < 1) return;
     const goals = buckets.filter(
-      (b) => b.type === 'savings_goal' && !b.isArchived && b.currentBalance < (b.targetAmount || 0)
+      (b) =>
+        b.type === "savings_goal" &&
+        !b.isArchived &&
+        b.currentBalance < (b.targetAmount || 0),
     );
     if (goals.length === 0) {
-      showToast('No open savings goals to sweep into', 'info');
+      showToast("No open savings goals to sweep into", "info");
       return;
     }
-    const needs = goals.map((g) => Math.max(1, (g.targetAmount || 0) - g.currentBalance));
+    const needs = goals.map((g) =>
+      Math.max(1, (g.targetAmount || 0) - g.currentBalance),
+    );
     const totalNeed = needs.reduce((s, n) => s + n, 0);
     const today = new Date().toISOString().slice(0, 10);
     const deposits: Transaction[] = [];
     let allocated = 0;
     goals.forEach((g, i) => {
       const share =
-        i === goals.length - 1 ? sweep - allocated : Math.round((sweep * needs[i]) / totalNeed);
+        i === goals.length - 1
+          ? sweep - allocated
+          : Math.round((sweep * needs[i]) / totalNeed);
       if (share <= 0) return;
       allocated += share;
       deposits.push({
         id: `sweep-${Date.now()}-${i}`,
         bucketId: g.id,
         amount: share,
-        type: 'savings_deposit',
+        type: "savings_deposit",
         date: today,
-        note: 'Swept from daily-spend surplus',
-        merchant: 'Auto Sweep',
-        source: 'manual',
+        note: "Swept from daily-spend surplus",
+        merchant: "Auto Sweep",
+        source: "manual",
         createdAt: new Date().toISOString(),
       });
     });
     if (deposits.length === 0) return;
-    const depById = new Map(deposits.map((d) => [d.bucketId, d.amount]));
-    setTransactions([...deposits, ...transactions]);
-    saveTransactions([...deposits, ...transactions]);
-    const updatedBuckets = buckets.map((b) =>
-      depById.has(b.id) ? { ...b, currentBalance: b.currentBalance + (depById.get(b.id) || 0) } : b
+    const byId = new Map(deposits.map((d) => [d.bucketId, d.amount]));
+    commitTxs([...deposits, ...transactions]);
+    commitBuckets(
+      buckets.map((b) =>
+        byId.has(b.id)
+          ? { ...b, currentBalance: b.currentBalance + (byId.get(b.id) || 0) }
+          : b,
+      ),
     );
-    setBuckets(updatedBuckets);
-    saveBuckets(updatedBuckets);
-    showToast(`Swept ${formatCurrency(allocated)} into ${deposits.length} goal${deposits.length > 1 ? 's' : ''}`);
+    showToast(
+      `Swept ${formatCurrency(allocated)} into ${deposits.length} goal${deposits.length > 1 ? "s" : ""}`,
+    );
   };
 
   const handleSettleDebt = (counterparty: string) => {
     const key = counterparty.trim().toLowerCase();
     let n = 0;
-    const updatedTxs = transactions.map((t) => {
+    const updated = transactions.map((t) => {
       if (
-        t.type === 'expense' &&
-        t.paidBy === 'other' &&
+        t.type === "expense" &&
+        t.paidBy === "other" &&
         !t.settled &&
-        (t.counterparty || '').trim().toLowerCase() === key
+        (t.counterparty || "").trim().toLowerCase() === key
       ) {
         n += 1;
         return { ...t, settled: true };
@@ -219,72 +280,121 @@ export default function App() {
       return t;
     });
     if (n === 0) return;
-    setTransactions(updatedTxs);
-    saveTransactions(updatedTxs);
-    showToast(`Settled up with ${counterparty.trim()} (${n} ${n === 1 ? 'expense' : 'expenses'})`);
+    commitTxs(updated);
+    showToast(
+      `Settled up with ${counterparty.trim()} (${n} ${n === 1 ? "item" : "items"})`,
+    );
   };
 
   const handleDeleteTransaction = (id: string) => {
     const tx = transactions.find((t) => t.id === id);
     if (!tx) return;
-    const updatedTxs = transactions.filter((t) => t.id !== id);
-    setTransactions(updatedTxs);
-    saveTransactions(updatedTxs);
-    if (tx.type === 'savings_deposit') {
-      const updatedBuckets = buckets.map((b) =>
-        b.id === tx.bucketId && b.type === 'savings_goal'
-          ? { ...b, currentBalance: Math.max(0, b.currentBalance - tx.amount) }
-          : b
+    const nextTxs = transactions.filter((t) => t.id !== id);
+    commitTxs(nextTxs);
+    if (tx.type === "savings_deposit") {
+      commitBuckets(
+        buckets.map((b) =>
+          b.id === tx.bucketId && b.type === "savings_goal"
+            ? {
+                ...b,
+                currentBalance: Math.max(0, b.currentBalance - tx.amount),
+              }
+            : b,
+        ),
       );
-      setBuckets(updatedBuckets);
-      saveBuckets(updatedBuckets);
     }
-    showToast(`Deleted ${formatCurrency(tx.amount)}`);
+    showToast(`Deleted ${formatCurrency(tx.amount)}`, "info", {
+      label: "Undo",
+      run: () => {
+        setTransactions((cur) => {
+          const restored = [tx, ...cur].sort((a, b) =>
+            b.date.localeCompare(a.date),
+          );
+          saveTransactions(restored);
+          return restored;
+        });
+        if (tx.type === "savings_deposit") {
+          setBuckets((cur) => {
+            const bs = cur.map((b) =>
+              b.id === tx.bucketId && b.type === "savings_goal"
+                ? { ...b, currentBalance: b.currentBalance + tx.amount }
+                : b,
+            );
+            saveBuckets(bs);
+            return bs;
+          });
+        }
+      },
+    });
   };
 
-  const handleQuickAction = (bucket: Bucket, type: 'expense' | 'savings_deposit') => {
+  const handleQuickAction = (
+    bucket: Bucket,
+    type: "expense" | "savings_deposit",
+  ) => {
     setExpenseInitialBucketId(bucket.id);
     setExpenseInitialType(type);
     setIsAddExpenseOpen(true);
   };
 
   const handleInsightAction = (insight: RuleInsight) => {
-    if (insight.actionType === 'reallocate' && insight.bucketId && insight.targetBucketId) {
+    if (
+      insight.actionType === "reallocate" &&
+      insight.bucketId &&
+      insight.targetBucketId
+    ) {
       const source = buckets.find((b) => b.id === insight.bucketId);
       const target = buckets.find((b) => b.id === insight.targetBucketId);
       if (!source || !target) return;
       const amt = 2000;
-      const updated = buckets.map((b) => {
-        if (b.id === source.id) return { ...b, plannedMonthly: Math.max(0, b.plannedMonthly - amt) };
-        if (b.id === target.id) return { ...b, plannedMonthly: b.plannedMonthly + amt };
-        return b;
-      });
-      setBuckets(updated);
-      saveBuckets(updated);
+      commitBuckets(
+        buckets.map((b) => {
+          if (b.id === source.id)
+            return {
+              ...b,
+              plannedMonthly: Math.max(0, b.plannedMonthly - amt),
+            };
+          if (b.id === target.id)
+            return { ...b, plannedMonthly: b.plannedMonthly + amt };
+          return b;
+        }),
+      );
       showToast(`Reallocated ${formatCurrency(amt)} to "${target.name}"`);
-    } else if (insight.actionType === 'deposit' && insight.targetBucketId) {
+    } else if (insight.actionType === "deposit" && insight.targetBucketId) {
       const target = buckets.find((b) => b.id === insight.targetBucketId);
-      if (target) handleQuickAction(target, 'savings_deposit');
-    } else if (insight.actionType === 'adjust_budget') {
+      if (target) handleQuickAction(target, "savings_deposit");
+    } else if (insight.actionType === "adjust_budget") {
       setBucketToEdit(null);
       setIsBucketFormOpen(true);
-    } else if (insight.actionType === 'open_smart_savings') {
+    } else if (insight.actionType === "open_smart_savings") {
       setIsSmartSavingsOpen(true);
-    } else if (insight.actionType === 'sweep_to_goals') {
-      const pool = Number((insight.metric || '').replace(/[^\d]/g, '')) || 0;
+    } else if (insight.actionType === "sweep_to_goals") {
+      const pool = Number((insight.metric || "").replace(/[^\d]/g, "")) || 0;
       if (pool > 0) handleSweepToGoals(pool);
       else setIsSmartSavingsOpen(true);
     }
   };
 
   const insights = useMemo(
-    () => evaluateFinancialInsights(buckets, transactions, incomeProfile, new Date()),
-    [buckets, transactions, incomeProfile]
+    () =>
+      evaluateFinancialInsights(
+        buckets,
+        transactions,
+        incomeProfile,
+        new Date(),
+      ),
+    [buckets, transactions, incomeProfile],
   );
-
   const dailyAllowance = useMemo(
-    () => calculateDailyAllowance(buckets, transactions, incomeProfile, currentMonth, new Date()),
-    [buckets, transactions, incomeProfile, currentMonth]
+    () =>
+      calculateDailyAllowance(
+        buckets,
+        transactions,
+        incomeProfile,
+        currentMonth,
+        new Date(),
+      ),
+    [buckets, transactions, incomeProfile, currentMonth],
   );
 
   // --- Optional multi-device sync (Firebase) ---
@@ -295,11 +405,9 @@ export default function App() {
     saveBuckets(snap.buckets);
     setTransactions(snap.transactions);
     saveTransactions(snap.transactions);
-    setKeywordRules(snap.rules);
-    saveKeywordRules(snap.rules);
   };
   const cloud = useCloudSync({
-    snapshot: { income: incomeProfile, buckets, transactions, rules: keywordRules },
+    snapshot: { income: incomeProfile, buckets, transactions },
     onRemote: applyRemote,
   });
 
@@ -310,16 +418,35 @@ export default function App() {
         {toasts.map((toast) => (
           <div
             key={toast.id}
-            className="anim-rise pointer-events-auto bg-zinc-900/95 border border-zinc-700/80 shadow-2xl rounded-xl p-3 flex items-center gap-3 text-xs text-zinc-100 backdrop-blur"
+            className="anim-rise pointer-events-auto m-panel px-3.5 py-2.5 flex items-center gap-3 text-xs text-zinc-100"
           >
-            {toast.type === 'success' && <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />}
-            {toast.type === 'info' && <Info className="w-4 h-4 text-indigo-400 shrink-0" />}
-            {toast.type === 'error' && <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />}
-            <span className="flex-1 font-medium">{toast.message}</span>
+            {toast.type === "success" && (
+              <CheckCircle2 className="w-4 h-4 text-emerald-300 shrink-0" />
+            )}
+            {toast.type === "info" && (
+              <Info className="w-4 h-4 text-indigo-400 shrink-0" />
+            )}
+            {toast.type === "error" && (
+              <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
+            )}
+            <span className="flex-1">{toast.message}</span>
+            {toast.action && (
+              <button
+                type="button"
+                onClick={() => {
+                  toast.action!.run();
+                  dismissToast(toast.id);
+                }}
+                className="shrink-0 inline-flex items-center gap-1 font-semibold text-emerald-300 hover:text-emerald-400 cursor-pointer"
+              >
+                <Undo2 className="w-3.5 h-3.5" />
+                {toast.action.label}
+              </button>
+            )}
             <button
               type="button"
-              onClick={() => setToasts((prev) => prev.filter((t) => t.id !== toast.id))}
-              className="text-zinc-500 hover:text-zinc-300 p-1 cursor-pointer"
+              onClick={() => dismissToast(toast.id)}
+              className="text-zinc-500 hover:text-zinc-300 p-0.5 cursor-pointer"
             >
               <X className="w-3.5 h-3.5" />
             </button>
@@ -331,11 +458,7 @@ export default function App() {
         currentMonth={currentMonth}
         onMonthChange={setCurrentMonth}
         availableMonths={availableMonths}
-        onOpenAddExpense={() => {
-          setExpenseInitialBucketId(undefined);
-          setExpenseInitialType('expense');
-          setIsAddExpenseOpen(true);
-        }}
+        onOpenAddExpense={openAddExpense}
         onOpenWeeklyDigest={() => setIsWeeklyDigestOpen(true)}
         onOpenHistory={() => setIsHistoryOpen(true)}
         syncButton={
@@ -344,16 +467,34 @@ export default function App() {
             status={cloud.status}
             email={cloud.user?.email ?? null}
             lastError={cloud.lastError}
+            errorHint={cloud.errorHint}
             onSignIn={cloud.signIn}
             onSignOut={cloud.signOut}
+            onRetry={cloud.retry}
           />
         }
       />
 
-      {/* Cockpit — nothing here scrolls except the marked regions */}
+      {cloud.status === "error" && cloud.errorHint && (
+        <div className="shrink-0 flex items-center gap-3 px-4 py-2 bg-rose-500/10 border-b border-rose-500/30 text-xs text-rose-300">
+          <AlertCircle className="w-4 h-4 shrink-0 text-rose-400" />
+          <span className="flex-1">{cloud.errorHint}</span>
+          <button
+            type="button"
+            onClick={cloud.retry}
+            className="shrink-0 font-semibold hover:text-zinc-100 underline underline-offset-2"
+          >
+            Retry
+          </button>
+        </div>
+      )}
+
+      {/* On desktop nothing scrolls but the marked regions; on narrow screens the main area scrolls. */}
       <main className="flex-1 min-h-0 grid gap-3 p-3 grid-cols-1 lg:grid-cols-12 overflow-y-auto lg:overflow-hidden">
-        {/* Left rail: stats */}
-        <section className="lg:col-span-3 flex flex-col min-h-0 anim-rise" style={{ animationDelay: '40ms' }}>
+        <section
+          className="lg:col-span-3 flex flex-col gap-3 lg:min-h-0 anim-rise"
+          style={{ animationDelay: "40ms" }}
+        >
           <DashboardStats
             incomeProfile={incomeProfile}
             allowance={dailyAllowance}
@@ -362,12 +503,16 @@ export default function App() {
             currentMonth={currentMonth}
             onUpdateIncome={handleUpdateIncome}
           />
+          <SpendingBreakdown
+            buckets={buckets}
+            transactions={transactions}
+            currentMonth={currentMonth}
+          />
         </section>
 
-        {/* Centre: envelopes & goals */}
         <section
-          className="lg:col-span-5 min-h-0 flex flex-col anim-rise"
-          style={{ animationDelay: '110ms' }}
+          className="lg:col-span-5 lg:min-h-0 flex flex-col anim-rise"
+          style={{ animationDelay: "110ms" }}
         >
           <BucketList
             buckets={buckets}
@@ -387,15 +532,23 @@ export default function App() {
           />
         </section>
 
-        {/* Right rail: daily spend + feed */}
         <section
-          className="lg:col-span-4 flex flex-col gap-3 min-h-0 anim-rise"
-          style={{ animationDelay: '180ms' }}
+          className="lg:col-span-4 flex flex-col gap-3 lg:min-h-0 anim-rise"
+          style={{ animationDelay: "180ms" }}
         >
-          <DailyAllowanceWidget allowance={dailyAllowance} onSweepToGoals={handleSweepToGoals} />
-          <div className="flex-1 min-h-0 bl-scroll pr-1 flex flex-col gap-3">
-            <InsightsBanner insights={insights} onActionClick={handleInsightAction} />
-            <DebtsSummary transactions={transactions} onSettlePerson={handleSettleDebt} />
+          <DailyAllowanceWidget
+            allowance={dailyAllowance}
+            onSweepToGoals={handleSweepToGoals}
+          />
+          <div className="lg:flex-1 lg:min-h-0 lg:m-scroll lg:pr-1 flex flex-col gap-3">
+            <InsightsBanner
+              insights={insights}
+              onActionClick={handleInsightAction}
+            />
+            <DebtsSummary
+              transactions={transactions}
+              onSettlePerson={handleSettleDebt}
+            />
             <TransactionList
               transactions={transactions}
               buckets={buckets}
@@ -447,15 +600,16 @@ export default function App() {
         onClose={() => setIsSmartSavingsOpen(false)}
         buckets={buckets}
         incomeProfile={incomeProfile}
-        onApplyAllocations={(updatedBuckets) => {
-          setBuckets(updatedBuckets);
-          saveBuckets(updatedBuckets);
-          showToast('Smart allocations applied');
+        onApplyAllocations={(bs) => {
+          commitBuckets(bs);
+          showToast("Smart allocations applied");
         }}
       />
       <ConfirmDeleteModal
         state={confirmDeleteState}
-        onClose={() => setConfirmDeleteState((prev) => ({ ...prev, isOpen: false }))}
+        onClose={() =>
+          setConfirmDeleteState((prev) => ({ ...prev, isOpen: false }))
+        }
         onConfirm={handleExecuteConfirmedDelete}
       />
     </div>

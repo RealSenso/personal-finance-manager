@@ -1,6 +1,7 @@
-import { Bucket, UserIncomeProfile } from '../types';
+import { Bucket, UserIncomeProfile } from "../types";
 
-export type SavingsStrategy = 'balanced_accelerator' | 'high_velocity' | 'proportional';
+export type SavingsStrategy =
+  "balanced_accelerator" | "high_velocity" | "proportional";
 
 export interface GoalAllocationDetail {
   bucketId: string;
@@ -10,7 +11,7 @@ export interface GoalAllocationDetail {
   targetAmount: number;
   remainingAmount: number;
   isAchieved: boolean;
-  
+
   // Suggested Monthly Plan
   recommendedMonthly: number;
   baselineShare: number;
@@ -21,7 +22,7 @@ export interface GoalAllocationDetail {
   monthsToComplete: number;
   completionDateStr: string; // e.g. "Nov 2026"
   completionMonthIndex: number;
-  
+
   // Comparison vs naive equal distribution
   monthsSavedVsEqualSplit: number;
 }
@@ -46,21 +47,34 @@ export interface SmartSavingsOptimizationResult {
 export function optimizeSavingsDistribution(
   buckets: Bucket[],
   incomeProfile: UserIncomeProfile,
-  strategy: SavingsStrategy = 'balanced_accelerator',
-  currentDate: Date = new Date()
+  strategy: SavingsStrategy = "balanced_accelerator",
+  currentDate: Date = new Date(),
 ): SmartSavingsOptimizationResult {
   const totalMonthlyIncome =
     incomeProfile.stipend +
     incomeProfile.extra +
     (incomeProfile.otherStreams || []).reduce((sum, s) => sum + s.amount, 0);
 
-  const recurringBuckets = buckets.filter((b) => b.type === 'recurring' && !b.isArchived);
-  const totalRecurringExpenses = recurringBuckets.reduce((sum, b) => sum + b.plannedMonthly, 0);
+  const recurringBuckets = buckets.filter(
+    (b) => b.type === "recurring" && !b.isArchived,
+  );
+  const totalRecurringExpenses = recurringBuckets.reduce(
+    (sum, b) => sum + b.plannedMonthly,
+    0,
+  );
 
-  const availableSavingsPool = Math.max(0, totalMonthlyIncome - totalRecurringExpenses);
+  const availableSavingsPool = Math.max(
+    0,
+    totalMonthlyIncome - totalRecurringExpenses,
+  );
 
-  const allSavingsGoals = buckets.filter((b) => b.type === 'savings_goal' && !b.isArchived);
-  const currentAllocatedToSavings = allSavingsGoals.reduce((sum, b) => sum + b.plannedMonthly, 0);
+  const allSavingsGoals = buckets.filter(
+    (b) => b.type === "savings_goal" && !b.isArchived,
+  );
+  const currentAllocatedToSavings = allSavingsGoals.reduce(
+    (sum, b) => sum + b.plannedMonthly,
+    0,
+  );
   const poolDifference = availableSavingsPool - currentAllocatedToSavings;
 
   const incompleteGoals = allSavingsGoals.filter((g) => {
@@ -75,27 +89,30 @@ export function optimizeSavingsDistribution(
 
   // If no savings pool or no incomplete goals
   if (availableSavingsPool <= 0 || incompleteGoals.length === 0) {
-    const defaultAllocations: GoalAllocationDetail[] = allSavingsGoals.map((g) => {
-      const target = g.targetAmount || 0;
-      const remaining = Math.max(0, target - g.currentBalance);
-      return {
-        bucketId: g.id,
-        bucketName: g.name,
-        color: g.color,
-        currentBalance: g.currentBalance,
-        targetAmount: target,
-        remainingAmount: remaining,
-        isAchieved: remaining === 0,
-        recommendedMonthly: g.plannedMonthly,
-        baselineShare: 0,
-        acceleratorShare: 0,
-        percentageOfPool: 0,
-        monthsToComplete: remaining === 0 ? 0 : 999,
-        completionDateStr: remaining === 0 ? 'Goal Achieved! 🎉' : 'Needs funding',
-        completionMonthIndex: 0,
-        monthsSavedVsEqualSplit: 0,
-      };
-    });
+    const defaultAllocations: GoalAllocationDetail[] = allSavingsGoals.map(
+      (g) => {
+        const target = g.targetAmount || 0;
+        const remaining = Math.max(0, target - g.currentBalance);
+        return {
+          bucketId: g.id,
+          bucketName: g.name,
+          color: g.color,
+          currentBalance: g.currentBalance,
+          targetAmount: target,
+          remainingAmount: remaining,
+          isAchieved: remaining === 0,
+          recommendedMonthly: g.plannedMonthly,
+          baselineShare: 0,
+          acceleratorShare: 0,
+          percentageOfPool: 0,
+          monthsToComplete: remaining === 0 ? 0 : 999,
+          completionDateStr:
+            remaining === 0 ? "Goal Achieved! 🎉" : "Needs funding",
+          completionMonthIndex: 0,
+          monthsSavedVsEqualSplit: 0,
+        };
+      },
+    );
 
     return {
       totalMonthlyIncome,
@@ -138,15 +155,15 @@ export function optimizeSavingsDistribution(
     ];
   } else {
     // Strategy baseline & accelerator pool split
-    let baselinePct = 0.30; // 30% baseline distributed across all goals
-    let acceleratorPct = 0.70;
+    let baselinePct = 0.3; // 30% baseline distributed across all goals
+    let acceleratorPct = 0.7;
 
-    if (strategy === 'high_velocity') {
+    if (strategy === "high_velocity") {
       baselinePct = 0.15;
       acceleratorPct = 0.85;
-    } else if (strategy === 'proportional') {
-      baselinePct = 0.50;
-      acceleratorPct = 0.50;
+    } else if (strategy === "proportional") {
+      baselinePct = 0.5;
+      acceleratorPct = 0.5;
     }
 
     const baselinePool = availableSavingsPool * baselinePct;
@@ -191,13 +208,13 @@ export function optimizeSavingsDistribution(
   const cascadeResults = simulateCascade(
     sortedIncomplete,
     rawAllocations.map((a) => a.total),
-    currentDate
+    currentDate,
   );
 
   const equalSplitResults = simulateCascade(
     sortedIncomplete,
     sortedIncomplete.map(() => equalMonthlyPerGoal),
-    currentDate
+    currentDate,
   );
 
   const allocMap = new Map<string, (typeof rawAllocations)[0]>();
@@ -221,7 +238,7 @@ export function optimizeSavingsDistribution(
         acceleratorShare: 0,
         percentageOfPool: 0,
         monthsToComplete: 0,
-        completionDateStr: 'Goal Achieved! 🎉',
+        completionDateStr: "Goal Achieved! 🎉",
         completionMonthIndex: 0,
         monthsSavedVsEqualSplit: 0,
       };
@@ -231,11 +248,23 @@ export function optimizeSavingsDistribution(
     const monthly = alloc ? alloc.total : g.plannedMonthly;
     const baseline = alloc ? alloc.baseline : 0;
     const accelerator = alloc ? alloc.accelerator : 0;
-    const pct = availableSavingsPool > 0 ? Math.round((monthly / availableSavingsPool) * 100) : 0;
+    const pct =
+      availableSavingsPool > 0
+        ? Math.round((monthly / availableSavingsPool) * 100)
+        : 0;
 
-    const sim = cascadeResults.get(g.id) || { months: 99, dateStr: 'Indefinite' };
-    const equalSim = equalSplitResults.get(g.id) || { months: 99, dateStr: 'Indefinite' };
-    const monthsSaved = Math.max(0, Number((equalSim.months - sim.months).toFixed(1)));
+    const sim = cascadeResults.get(g.id) || {
+      months: 99,
+      dateStr: "Indefinite",
+    };
+    const equalSim = equalSplitResults.get(g.id) || {
+      months: 99,
+      dateStr: "Indefinite",
+    };
+    const monthsSaved = Math.max(
+      0,
+      Number((equalSim.months - sim.months).toFixed(1)),
+    );
 
     return {
       bucketId: g.id,
@@ -258,7 +287,9 @@ export function optimizeSavingsDistribution(
 
   // Summary
   const firstIncomplete = sortedIncomplete[0];
-  const firstSim = firstIncomplete ? cascadeResults.get(firstIncomplete.id) : null;
+  const firstSim = firstIncomplete
+    ? cascadeResults.get(firstIncomplete.id)
+    : null;
   const lastIncomplete = sortedIncomplete[sortedIncomplete.length - 1];
   const lastSim = lastIncomplete ? cascadeResults.get(lastIncomplete.id) : null;
 
@@ -289,10 +320,10 @@ export function optimizeSavingsDistribution(
 function simulateCascade(
   goals: Bucket[],
   initialMonthlyDeposits: number[],
-  startDate: Date
+  startDate: Date,
 ): Map<string, { months: number; dateStr: string }> {
   const results = new Map<string, { months: number; dateStr: string }>();
-  
+
   const balances = goals.map((g) => g.currentBalance);
   const targets = goals.map((g) => g.targetAmount || 0);
   let monthlyRates = [...initialMonthlyDeposits];
@@ -315,7 +346,7 @@ function simulateCascade(
         // Calculate date string
         const futureDate = new Date(startDate);
         futureDate.setMonth(startDate.getMonth() + m);
-        const dateStr = `${futureDate.toLocaleString('en-US', { month: 'short' })} ${futureDate.getFullYear()} (~${m} mos)`;
+        const dateStr = `${futureDate.toLocaleString("en-US", { month: "short" })} ${futureDate.getFullYear()} (~${m} mos)`;
         results.set(goals[i].id, { months: m, dateStr });
       }
     }
@@ -341,7 +372,7 @@ function simulateCascade(
   // For any unfinished
   for (let i = 0; i < goals.length; i++) {
     if (!results.has(goals[i].id)) {
-      results.set(goals[i].id, { months: 999, dateStr: '>10 years' });
+      results.set(goals[i].id, { months: 999, dateStr: ">10 years" });
     }
   }
 

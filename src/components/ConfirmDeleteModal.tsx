@@ -1,16 +1,16 @@
-import React from 'react';
-import { 
-  AlertTriangle, 
-  Trash2, 
-  X, 
-  Wallet, 
-  PiggyBank, 
-  Receipt 
-} from 'lucide-react';
+import React from "react";
+import {
+  AlertTriangle,
+  Trash2,
+  X,
+  Wallet,
+  PiggyBank,
+  Receipt,
+} from "lucide-react";
 
 export interface ConfirmDeleteState {
   isOpen: boolean;
-  type: 'bucket' | 'transaction' | 'reset' | 'rule';
+  type: "bucket" | "transaction" | "reset" | "rule";
   title: string;
   description: string;
   itemId: string;
@@ -33,19 +33,19 @@ export const ConfirmDeleteModal: React.FC<ConfirmDeleteModalProps> = ({
 
   const getIcon = () => {
     switch (state.type) {
-      case 'bucket':
+      case "bucket":
         return <Wallet className="w-5 h-5 text-rose-400" />;
-      case 'transaction':
+      case "transaction":
         return <Receipt className="w-5 h-5 text-rose-400" />;
-      case 'reset':
+      case "reset":
       default:
         return <AlertTriangle className="w-5 h-5 text-rose-400" />;
     }
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-xs">
-      <div 
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/30 backdrop-blur-xs">
+      <div
         role="dialog"
         aria-modal="true"
         className="bg-zinc-950 border border-zinc-800 rounded-2xl w-full max-w-md overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-150"
@@ -95,7 +95,8 @@ export const ConfirmDeleteModal: React.FC<ConfirmDeleteModalProps> = ({
           </p>
 
           <p className="text-[11px] text-zinc-500 font-mono">
-            Note: This action cannot be undone. You can export a backup beforehand from the Export menu if needed.
+            Note: This action cannot be undone. You can export a backup
+            beforehand from the Export menu if needed.
           </p>
         </div>
 
@@ -114,7 +115,7 @@ export const ConfirmDeleteModal: React.FC<ConfirmDeleteModalProps> = ({
               onConfirm();
               onClose();
             }}
-            className="px-4 py-2 rounded-xl text-xs font-semibold text-white bg-rose-600 hover:bg-rose-500 transition-colors shadow-sm cursor-pointer flex items-center gap-1.5"
+            className="px-4 py-2 rounded-xl text-xs font-semibold text-zinc-100 bg-rose-600 hover:bg-rose-500 transition-colors shadow-sm cursor-pointer flex items-center gap-1.5"
           >
             <Trash2 className="w-3.5 h-3.5" />
             <span>Confirm Delete</span>

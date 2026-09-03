@@ -1,16 +1,16 @@
-import React, { useState } from 'react';
-import { 
-  AlertTriangle, 
-  Info, 
-  CheckCircle, 
-  Sparkles, 
-  ArrowRight, 
+import React, { useState } from "react";
+import {
+  AlertTriangle,
+  Info,
+  CheckCircle,
+  Sparkles,
+  ArrowRight,
   X,
   Flame,
   Clock,
-  ArrowRightLeft
-} from 'lucide-react';
-import { RuleInsight } from '../types';
+  ArrowRightLeft,
+} from "lucide-react";
+import { RuleInsight } from "../types";
 
 interface InsightsBannerProps {
   insights: RuleInsight[];
@@ -33,44 +33,44 @@ export const InsightsBanner: React.FC<InsightsBannerProps> = ({
     setDismissedIds((prev) => new Set([...prev, id]));
   };
 
-  const getIcon = (type: RuleInsight['type']) => {
+  const getIcon = (type: RuleInsight["type"]) => {
     switch (type) {
-      case 'alert':
+      case "alert":
         return <AlertTriangle className="w-4 h-4 text-rose-400" />;
-      case 'warning':
+      case "warning":
         return <Flame className="w-4 h-4 text-amber-400" />;
-      case 'recommendation':
+      case "recommendation":
         return <ArrowRightLeft className="w-4 h-4 text-purple-400" />;
-      case 'success':
+      case "success":
         return <CheckCircle className="w-4 h-4 text-emerald-400" />;
-      case 'info':
+      case "info":
       default:
         return <Clock className="w-4 h-4 text-cyan-400" />;
     }
   };
 
-  const getBorderColor = (type: RuleInsight['type']) => {
+  const getBorderColor = (type: RuleInsight["type"]) => {
     switch (type) {
-      case 'alert':
-        return 'border-rose-500/30 bg-rose-950/20';
-      case 'warning':
-        return 'border-amber-500/30 bg-amber-950/20';
-      case 'recommendation':
-        return 'border-purple-500/30 bg-purple-950/20';
-      case 'success':
-        return 'border-emerald-500/30 bg-emerald-950/20';
-      case 'info':
+      case "alert":
+        return "border-rose-500/30 bg-rose-950/20";
+      case "warning":
+        return "border-amber-500/30 bg-amber-950/20";
+      case "recommendation":
+        return "border-purple-500/30 bg-purple-950/20";
+      case "success":
+        return "border-emerald-500/30 bg-emerald-950/20";
+      case "info":
       default:
-        return 'border-cyan-500/30 bg-cyan-950/20';
+        return "border-cyan-500/30 bg-cyan-950/20";
     }
   };
 
   return (
-    <div className="bl-panel bl-cut bg-zinc-900/40 border border-zinc-800 rounded-2xl p-3 space-y-2.5">
+    <div className="m-panel bg-zinc-900/40 border border-zinc-800 rounded-2xl p-3 space-y-2.5">
       <div className="flex items-center gap-2">
         <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-        <span className="bl-label text-emerald-400">
-          Field Analysis ({activeInsights.length})
+        <span className="m-label text-emerald-400">
+          Notes ({activeInsights.length})
         </span>
       </div>
 
@@ -79,7 +79,7 @@ export const InsightsBanner: React.FC<InsightsBannerProps> = ({
           <div
             key={item.id}
             className={`border rounded-xl p-3.5 flex items-start justify-between gap-3 transition-colors ${getBorderColor(
-              item.type
+              item.type,
             )}`}
           >
             <div className="flex items-start gap-2.5 flex-1 min-w-0">

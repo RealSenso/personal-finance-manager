@@ -1,22 +1,25 @@
-# Personal Finance Manager
+# Mirai · 未来
 
-Envelope-budgeting dashboard. Local-first (everything works offline in the browser),
-with optional Firebase sign-in for active multi-device sync.
+A quiet **kakeibo** — a calm, single-screen household ledger.
+Local-first (works fully offline in the browser); optional Google sign-in for
+active multi-device sync.
+
+Light "washi paper" theme, one matcha accent, no page scrolling — only the
+panels scroll.
 
 ## What it does
 
-- **Income & savings rate** — enter income and the % you want reserved for goals (default 25%).
-- **Fixed bills vs day-to-day** — mark recurring buckets (Claude, recharge, rent) as *fixed*.
-  They're paid in full each month and are excluded from the daily budget and pace warnings.
-- **Safe daily allowance** — `income − savings reserve − fixed bills`, spread over the days
-  left in the month. Spend less than the pace and the surplus is offered back to your goals
-  ("sweep to goals").
-- **Debt tracking** — log an expense someone else paid for; it shows under "Money You Owe"
+- **Income & savings rate** — your income and the % reserved for goals (default 25%).
+- **Budget model** — `income − savings reserve − scheduled goal deposits − fixed bills`,
+  spread over the days left in the month = a safe daily allowance. Spend under the
+  pace and the surplus is offered back to your goals ("sweep to goals").
+- **Fixed bills** — mark recurring envelopes (subscriptions, rent, recharge) as *fixed*:
+  excluded from the daily budget, and only flagged if they overrun.
+- **Envelopes & savings goals** with live pacing and goal ETAs.
+- **Debts** — log an expense someone else paid for; it sits under "Money you owe"
   until you settle.
-- **Backdated entries** — add expenses for any date; every number recalculates and the view
-  jumps to that month.
-- Savings-goal ETAs, weekly digest, monthly history.
-- Single-viewport "cockpit" UI (Blue Lock themed) — the page never scrolls, only panels do.
+- **Where it went** — this month's spending, envelope by envelope.
+- **Backdated entries**, month history, weekly digest, undo on delete, `N` to log.
 
 ## Run locally
 
@@ -27,26 +30,23 @@ npm run dev
 
 ## Multi-device sync (optional)
 
-1. Create a free [Firebase](https://console.firebase.google.com) project.
-2. Add a **Web App**, enable **Authentication → Google**, create a **Firestore** database.
-3. Firestore rules — each user owns one document:
+Set the six `VITE_FIREBASE_*` vars (`.env.local` for dev, repo **secrets** for the
+deploy) and publish this Firestore rule so each user owns one document:
 
-   ```
-   rules_version = '2';
-   service cloud.firestore {
-     match /databases/{db}/documents {
-       match /users/{uid} {
-         allow read, write: if request.auth != null && request.auth.uid == uid;
-       }
-     }
-   }
-   ```
+```
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /users/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+  }
+}
+```
 
-4. Local: copy `.env.example` to `.env.local` and fill in the Firebase web config.
-5. Deployed: add the same values as **repo secrets** (`VITE_FIREBASE_*`) — the deploy
-   workflow passes them into the build.
-
-Without these vars the app runs fully local; the header shows "Local only".
+Then `firebase deploy --only firestore:rules` (config is in `firebase.json` /
+`.firebaserc`), or paste it in the Firebase console. Without these vars the header
+shows "Local only" and everything still works.
 
 ## Deploy
 

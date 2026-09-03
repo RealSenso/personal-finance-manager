@@ -1,15 +1,27 @@
-import React, { useState } from 'react';
-import { X, Plus, Minus, PiggyBank, Receipt, Calendar, Wallet, Users } from 'lucide-react';
-import { Bucket, Transaction, TransactionType } from '../types';
+import React, { useEffect, useState } from "react";
+import {
+  X,
+  Plus,
+  Minus,
+  PiggyBank,
+  Receipt,
+  Wallet,
+  Users,
+} from "lucide-react";
+import { Bucket, Transaction, TransactionType } from "../types";
 
 interface AddExpenseModalProps {
   isOpen: boolean;
   onClose: () => void;
   buckets: Bucket[];
-  onAddTransaction: (transaction: Omit<Transaction, 'id' | 'createdAt'>) => void;
+  onAddTransaction: (
+    transaction: Omit<Transaction, "id" | "createdAt">,
+  ) => void;
   initialBucketId?: string;
   initialType?: TransactionType;
 }
+
+const today = () => new Date().toISOString().slice(0, 10);
 
 export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
   isOpen,
@@ -17,138 +29,138 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
   buckets,
   onAddTransaction,
   initialBucketId,
-  initialType = 'expense',
+  initialType = "expense",
 }) => {
   const [type, setType] = useState<TransactionType>(initialType);
-  const [bucketId, setBucketId] = useState<string>(
-    initialBucketId || buckets[0]?.id || ''
-  );
-  const [amount, setAmount] = useState<string>('');
-  const [note, setNote] = useState<string>('');
-  const [merchant, setMerchant] = useState<string>('');
-  const [paidBy, setPaidBy] = useState<'me' | 'other'>('me');
-  const [counterparty, setCounterparty] = useState<string>('');
-  const [errorMessage, setErrorMessage] = useState<string>('');
-  
-  // Format today's date YYYY-MM-DD
-  const todayStr = new Date().toISOString().slice(0, 10);
-  const [date, setDate] = useState<string>(todayStr);
+  const [bucketId, setBucketId] = useState("");
+  const [amount, setAmount] = useState("");
+  const [note, setNote] = useState("");
+  const [paidBy, setPaidBy] = useState<"me" | "other">("me");
+  const [counterparty, setCounterparty] = useState("");
+  const [date, setDate] = useState(today());
+  const [error, setError] = useState("");
+
+  const active = buckets.filter((b) => !b.isArchived);
+
+  // Re-seed the form every time the dialog opens (so "Log Spend" on a card
+  // preselects that card's envelope, and stale values don't linger).
+  useEffect(() => {
+    if (!isOpen) return;
+    const startType = initialType;
+    setType(startType);
+    const pool =
+      startType === "savings_deposit"
+        ? active.filter((b) => b.type === "savings_goal")
+        : active;
+    setBucketId(
+      initialBucketId && pool.some((b) => b.id === initialBucketId)
+        ? initialBucketId
+        : pool[0]?.id || "",
+    );
+    setAmount("");
+    setNote("");
+    setPaidBy("me");
+    setCounterparty("");
+    setDate(today());
+    setError("");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, initialBucketId, initialType]);
 
   if (!isOpen) return null;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const pool =
+    type === "savings_deposit"
+      ? active.filter((b) => b.type === "savings_goal")
+      : active;
+
+  const switchType = (t: TransactionType) => {
+    setType(t);
+    const p =
+      t === "savings_deposit"
+        ? active.filter((b) => b.type === "savings_goal")
+        : active;
+    if (!p.some((b) => b.id === bucketId)) setBucketId(p[0]?.id || "");
+  };
+
+  const submit = (e: React.FormEvent) => {
     e.preventDefault();
-    const numAmount = parseFloat(amount);
-    if (isNaN(numAmount) || numAmount <= 0) {
-      setErrorMessage('Please enter a valid positive amount in ₹');
-      return;
-    }
-    if (!bucketId) {
-      setErrorMessage('Please select a bucket envelope');
-      return;
-    }
-    const isBorrowed = type === 'expense' && paidBy === 'other';
-    if (isBorrowed && !counterparty.trim()) {
-      setErrorMessage('Enter the name of the person who paid for you');
-      return;
-    }
-
-    setErrorMessage('');
-
+    const n = parseFloat(amount);
+    if (isNaN(n) || n <= 0) return setError("Enter a positive amount");
+    if (!bucketId) return setError("Pick an envelope");
+    const borrowed = type === "expense" && paidBy === "other";
+    if (borrowed && !counterparty.trim()) return setError("Who paid for you?");
+    setError("");
     onAddTransaction({
       bucketId,
-      amount: numAmount,
+      amount: n,
       type,
       date,
-      note: note.trim() || merchant.trim() || (type === 'expense' ? 'Expense' : 'Deposit'),
-      merchant: merchant.trim() || undefined,
-      source: 'manual',
-      paidBy: type === 'expense' ? paidBy : undefined,
-      counterparty: isBorrowed ? counterparty.trim() : undefined,
-      settled: isBorrowed ? false : undefined,
+      note: note.trim() || (type === "expense" ? "Expense" : "Deposit"),
+      source: "manual",
+      paidBy: type === "expense" ? paidBy : undefined,
+      counterparty: borrowed ? counterparty.trim() : undefined,
+      settled: borrowed ? false : undefined,
     });
-
-    setAmount('');
-    setNote('');
-    setMerchant('');
-    setPaidBy('me');
-    setCounterparty('');
     onClose();
   };
 
-  const activeBuckets = buckets.filter((b) => !b.isArchived);
-  const filteredBuckets =
-    type === 'savings_deposit'
-      ? activeBuckets.filter((b) => b.type === 'savings_goal')
-      : activeBuckets;
+  const seg = (activeSel: boolean, tone: string) =>
+    `py-1.5 rounded-lg flex items-center justify-center gap-1.5 transition-colors cursor-pointer ${
+      activeSel
+        ? `bg-zinc-800 ${tone} font-semibold`
+        : "text-zinc-400 hover:text-zinc-200"
+    }`;
+  const field =
+    "w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-zinc-200 focus:outline-none focus:border-emerald-500";
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs">
-      <div className="bg-zinc-950 border border-zinc-800 rounded-2xl w-full max-w-md overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-150">
-        {/* Modal Header */}
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/30 backdrop-blur-xs">
+      <div className="m-panel w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95 duration-150">
         <div className="flex items-center justify-between px-5 py-4 border-b border-zinc-800">
           <div className="flex items-center gap-2">
-            {type === 'expense' ? (
-              <Receipt className="w-5 h-5 text-rose-400" />
+            {type === "expense" ? (
+              <Receipt className="w-4 h-4 text-rose-400" />
             ) : (
-              <PiggyBank className="w-5 h-5 text-emerald-400" />
+              <PiggyBank className="w-4 h-4 text-emerald-300" />
             )}
-            <h3 className="text-sm font-bold text-zinc-100 tracking-tight">
-              {type === 'expense' ? 'Log New Expense' : 'Log Savings Deposit'}
+            <h3 className="text-sm font-semibold text-zinc-100">
+              {type === "expense" ? "Log an expense" : "Log a savings deposit"}
             </h3>
           </div>
           <button
             onClick={onClose}
-            className="text-zinc-400 hover:text-zinc-200 p-1 rounded-lg hover:bg-zinc-900 transition-colors cursor-pointer"
+            className="text-zinc-400 hover:text-zinc-200 p-1 rounded-lg hover:bg-zinc-800 transition-colors cursor-pointer"
           >
             <X className="w-4 h-4" />
           </button>
         </div>
 
-        {/* Modal Body */}
-        <form onSubmit={handleSubmit} className="p-5 space-y-4">
-          {/* Type Toggle */}
+        <form onSubmit={submit} className="p-5 space-y-4">
           <div className="grid grid-cols-2 gap-2 p-1 bg-zinc-900 rounded-xl border border-zinc-800 text-xs font-medium">
             <button
               type="button"
-              onClick={() => {
-                setType('expense');
-                if (filteredBuckets.length > 0) setBucketId(filteredBuckets[0].id);
-              }}
-              className={`py-1.5 rounded-lg flex items-center justify-center gap-1.5 transition-colors cursor-pointer ${
-                type === 'expense'
-                  ? 'bg-zinc-800 text-rose-400 font-semibold shadow-sm'
-                  : 'text-zinc-400 hover:text-zinc-200'
-              }`}
+              onClick={() => switchType("expense")}
+              className={seg(type === "expense", "text-rose-400")}
             >
               <Minus className="w-3.5 h-3.5" />
               <span>Expense</span>
             </button>
             <button
               type="button"
-              onClick={() => {
-                setType('savings_deposit');
-                const savings = activeBuckets.filter((b) => b.type === 'savings_goal');
-                if (savings.length > 0) setBucketId(savings[0].id);
-              }}
-              className={`py-1.5 rounded-lg flex items-center justify-center gap-1.5 transition-colors cursor-pointer ${
-                type === 'savings_deposit'
-                  ? 'bg-zinc-800 text-emerald-400 font-semibold shadow-sm'
-                  : 'text-zinc-400 hover:text-zinc-200'
-              }`}
+              onClick={() => switchType("savings_deposit")}
+              className={seg(type === "savings_deposit", "text-emerald-300")}
             >
               <Plus className="w-3.5 h-3.5" />
-              <span>Savings Deposit</span>
+              <span>Deposit</span>
             </button>
           </div>
 
-          {/* Amount (₹) */}
           <div>
             <label className="text-xs font-medium text-zinc-400 block mb-1">
               Amount (₹) <span className="text-rose-400">*</span>
             </label>
             <div className="relative">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500 font-mono text-base font-semibold">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500 font-mono text-base">
                 ₹
               </span>
               <input
@@ -157,34 +169,32 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
                 min="0"
                 required
                 autoFocus
-                placeholder="0.00"
+                placeholder="0"
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
-                className="w-full bg-zinc-900 border border-zinc-800 rounded-xl pl-8 pr-4 py-2.5 text-base font-mono font-bold text-white focus:outline-none focus:border-emerald-500"
+                className="w-full bg-zinc-900 border border-zinc-800 rounded-xl pl-8 pr-4 py-2.5 text-base font-mono font-semibold text-zinc-100 focus:outline-none focus:border-emerald-500"
               />
             </div>
           </div>
 
-          {/* Bucket Envelope */}
           <div>
             <label className="text-xs font-medium text-zinc-400 block mb-1">
-              Target Envelope / Bucket <span className="text-rose-400">*</span>
+              Envelope <span className="text-rose-400">*</span>
             </label>
             <select
               value={bucketId}
               onChange={(e) => setBucketId(e.target.value)}
               required
-              className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-zinc-200 focus:outline-none focus:border-emerald-500 cursor-pointer"
+              className={`${field} cursor-pointer`}
             >
-              {filteredBuckets.map((b) => (
+              {pool.map((b) => (
                 <option key={b.id} value={b.id}>
-                  {b.name} ({b.type === 'recurring' ? `Recurring • ₹${b.plannedMonthly}/mo` : `Goal • Target ₹${b.targetAmount}`})
+                  {b.name}
                 </option>
               ))}
             </select>
           </div>
 
-          {/* Date Picker */}
           <div>
             <label className="text-xs font-medium text-zinc-400 block mb-1">
               Date
@@ -194,12 +204,11 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
               value={date}
               onChange={(e) => setDate(e.target.value)}
               required
-              className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-zinc-200 focus:outline-none focus:border-emerald-500 font-mono"
+              className={`${field} font-mono`}
             />
           </div>
 
-          {/* Paid By (debt tracking) */}
-          {type === 'expense' && (
+          {type === "expense" && (
             <div>
               <label className="text-xs font-medium text-zinc-400 block mb-1">
                 Paid by
@@ -207,83 +216,55 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
               <div className="grid grid-cols-2 gap-2 p-1 bg-zinc-900 rounded-xl border border-zinc-800 text-xs font-medium">
                 <button
                   type="button"
-                  onClick={() => setPaidBy('me')}
-                  className={`py-1.5 rounded-lg flex items-center justify-center gap-1.5 transition-colors cursor-pointer ${
-                    paidBy === 'me'
-                      ? 'bg-zinc-800 text-emerald-400 font-semibold shadow-sm'
-                      : 'text-zinc-400 hover:text-zinc-200'
-                  }`}
+                  onClick={() => setPaidBy("me")}
+                  className={seg(paidBy === "me", "text-emerald-300")}
                 >
                   <Wallet className="w-3.5 h-3.5" />
                   <span>Me</span>
                 </button>
                 <button
                   type="button"
-                  onClick={() => setPaidBy('other')}
-                  className={`py-1.5 rounded-lg flex items-center justify-center gap-1.5 transition-colors cursor-pointer ${
-                    paidBy === 'other'
-                      ? 'bg-zinc-800 text-amber-400 font-semibold shadow-sm'
-                      : 'text-zinc-400 hover:text-zinc-200'
-                  }`}
+                  onClick={() => setPaidBy("other")}
+                  className={seg(paidBy === "other", "text-amber-400")}
                 >
                   <Users className="w-3.5 h-3.5" />
                   <span>Someone else</span>
                 </button>
               </div>
-              {paidBy === 'other' && (
+              {paidBy === "other" && (
                 <div className="mt-2">
                   <input
                     type="text"
-                    placeholder="Who paid? (you'll owe them this amount)"
+                    placeholder="Who paid? You'll owe them this."
                     value={counterparty}
                     onChange={(e) => setCounterparty(e.target.value)}
-                    className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-zinc-200 focus:outline-none focus:border-amber-500"
+                    className={`${field} focus:border-amber-500`}
                   />
-                  <p className="text-[11px] text-amber-400/80 mt-1">
-                    Logged against the envelope now and tracked as money you owe {counterparty.trim() || 'them'} until you settle up.
-                  </p>
                 </div>
               )}
             </div>
           )}
 
-          {/* Merchant / Payee */}
           <div>
             <label className="text-xs font-medium text-zinc-400 block mb-1">
-              Merchant / Payee (Optional)
+              Note
             </label>
             <input
               type="text"
-              placeholder="e.g. Swiggy, Jio, Anthropic, Landlord"
-              value={merchant}
-              onChange={(e) => setMerchant(e.target.value)}
-              className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-zinc-200 focus:outline-none focus:border-emerald-500"
-            />
-          </div>
-
-          {/* Description / Note */}
-          <div>
-            <label className="text-xs font-medium text-zinc-400 block mb-1">
-              Note / Description
-            </label>
-            <input
-              type="text"
-              placeholder="e.g. Dinner with team, monthly recharge"
+              placeholder="e.g. dinner with friends"
               value={note}
               onChange={(e) => setNote(e.target.value)}
-              className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-zinc-200 focus:outline-none focus:border-emerald-500"
+              className={field}
             />
           </div>
 
-          {errorMessage && (
-            <div className="bg-rose-950/40 border border-rose-500/40 text-rose-300 px-3 py-2 rounded-xl text-xs flex items-center gap-2">
-              <span className="w-1.5 h-1.5 rounded-full bg-rose-400 shrink-0" />
-              <span>{errorMessage}</span>
+          {error && (
+            <div className="bg-rose-950/50 border border-rose-500/40 text-rose-300 px-3 py-2 rounded-xl text-xs">
+              {error}
             </div>
           )}
 
-          {/* Form Actions */}
-          <div className="pt-2 flex items-center justify-end gap-2.5">
+          <div className="pt-1 flex items-center justify-end gap-2.5">
             <button
               type="button"
               onClick={onClose}
@@ -293,9 +274,9 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
             </button>
             <button
               type="submit"
-              className="px-5 py-2 rounded-xl text-xs font-semibold text-zinc-950 bg-emerald-400 hover:bg-emerald-300 transition-colors shadow-sm cursor-pointer"
+              className="px-5 py-2 rounded-xl text-xs font-semibold text-zinc-950 bg-emerald-400 hover:bg-emerald-500 transition-colors cursor-pointer"
             >
-              Save Transaction
+              Save
             </button>
           </div>
         </form>

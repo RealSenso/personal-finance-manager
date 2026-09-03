@@ -1,26 +1,26 @@
-import React from 'react';
-import { 
-  PiggyBank, 
-  Wallet, 
-  Plus, 
-  Minus, 
-  MoreVertical, 
-  Edit, 
-  Trash2, 
-  Target, 
+import React from "react";
+import {
+  PiggyBank,
+  Wallet,
+  Plus,
+  Minus,
+  MoreVertical,
+  Edit,
+  Trash2,
+  Target,
   Calendar,
   AlertCircle,
   TrendingUp,
   Clock,
-  CheckCircle
-} from 'lucide-react';
-import { Bucket, Transaction } from '../types';
-import { 
-  formatCurrency, 
-  getBucketSpendForMonth, 
-  calculateSavingsETA, 
-  getDaysInMonth 
-} from '../lib/insights';
+  CheckCircle,
+} from "lucide-react";
+import { Bucket, Transaction } from "../types";
+import {
+  formatCurrency,
+  getBucketSpendForMonth,
+  calculateSavingsETA,
+  getDaysInMonth,
+} from "../lib/insights";
 
 interface BucketCardProps {
   bucket: Bucket;
@@ -28,7 +28,7 @@ interface BucketCardProps {
   currentMonth: string;
   onEdit: (bucket: Bucket) => void;
   onDelete: (bucketId: string) => void;
-  onQuickAction: (bucket: Bucket, type: 'expense' | 'savings_deposit') => void;
+  onQuickAction: (bucket: Bucket, type: "expense" | "savings_deposit") => void;
 }
 
 export const BucketCard: React.FC<BucketCardProps> = ({
@@ -39,15 +39,18 @@ export const BucketCard: React.FC<BucketCardProps> = ({
   onDelete,
   onQuickAction,
 }) => {
-  const [year, month] = currentMonth.split('-').map(Number);
+  const [year, month] = currentMonth.split("-").map(Number);
   const totalDays = getDaysInMonth(year, month - 1);
   const today = new Date();
-  const isCurrentMonth = today.getFullYear() === year && today.getMonth() === month - 1;
-  const currentDay = isCurrentMonth ? Math.min(today.getDate(), totalDays) : totalDays;
+  const isCurrentMonth =
+    today.getFullYear() === year && today.getMonth() === month - 1;
+  const currentDay = isCurrentMonth
+    ? Math.min(today.getDate(), totalDays)
+    : totalDays;
   const monthProgressRatio = currentDay / totalDays;
   const monthProgressPercent = Math.round(monthProgressRatio * 100);
 
-  if (bucket.type === 'recurring') {
+  if (bucket.type === "recurring") {
     const spent = getBucketSpendForMonth(bucket.id, transactions, currentMonth);
     const planned = bucket.plannedMonthly;
     const remaining = planned - spent;
@@ -55,10 +58,13 @@ export const BucketCard: React.FC<BucketCardProps> = ({
     const spentPercent = Math.min(100, Math.round(spentRatio * 100));
     const isExceeded = spent > planned;
     const isHot =
-      !bucket.isFixed && !isExceeded && spentRatio > monthProgressRatio + 0.15 && spent > 0;
+      !bucket.isFixed &&
+      !isExceeded &&
+      spentRatio > monthProgressRatio + 0.15 &&
+      spent > 0;
 
     return (
-      <div className="bl-panel bl-cut bg-zinc-900/80 border border-zinc-800 rounded-xl p-3.5 flex flex-col justify-between hover:border-emerald-500/40 transition-all group relative">
+      <div className="m-panel bg-zinc-900/80 border border-zinc-800 rounded-xl p-3.5 flex flex-col justify-between hover:border-emerald-500/40 transition-all group relative">
         <div>
           {/* Header row */}
           <div className="flex items-start justify-between">
@@ -78,7 +84,7 @@ export const BucketCard: React.FC<BucketCardProps> = ({
                   {bucket.name}
                 </h3>
                 <span className="text-[11px] text-zinc-400 font-mono">
-                  {bucket.category || 'Recurring'}
+                  {bucket.category || "Recurring"}
                 </span>
               </div>
             </div>
@@ -95,11 +101,11 @@ export const BucketCard: React.FC<BucketCardProps> = ({
                 </span>
               ) : isHot ? (
                 <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-amber-500/10 border border-amber-500/30 text-amber-400 font-semibold">
-                  Hot Pace
+                  Fast pace
                 </span>
               ) : (
                 <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 font-semibold">
-                  On Track
+                  On track
                 </span>
               )}
 
@@ -148,12 +154,14 @@ export const BucketCard: React.FC<BucketCardProps> = ({
                 <div
                   className={`h-full rounded-full transition-all ${
                     isExceeded
-                      ? 'bg-rose-500'
+                      ? "bg-rose-500"
                       : isHot
-                      ? 'bg-amber-400'
-                      : 'bg-emerald-500'
+                        ? "bg-amber-400"
+                        : "bg-emerald-500"
                   }`}
-                  style={{ width: `${Math.min(100, Math.round(spentRatio * 100))}%` }}
+                  style={{
+                    width: `${Math.min(100, Math.round(spentRatio * 100))}%`,
+                  }}
                 />
               </div>
 
@@ -185,10 +193,10 @@ export const BucketCard: React.FC<BucketCardProps> = ({
         {/* Card Footer Quick Action */}
         <div className="mt-4 pt-3 border-t border-zinc-800/80 flex items-center justify-between">
           <span className="text-[11px] text-zinc-400 truncate max-w-[160px]">
-            {bucket.notes || 'Monthly recurring'}
+            {bucket.notes || "Monthly recurring"}
           </span>
           <button
-            onClick={() => onQuickAction(bucket, 'expense')}
+            onClick={() => onQuickAction(bucket, "expense")}
             className="flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-200 transition-colors cursor-pointer"
           >
             <Minus className="w-3 h-3 text-rose-400" />
@@ -208,7 +216,7 @@ export const BucketCard: React.FC<BucketCardProps> = ({
   const isGoalReached = current >= target && target > 0;
 
   return (
-    <div className="bl-panel bl-cut bg-zinc-900/80 border border-zinc-800 rounded-xl p-3.5 flex flex-col justify-between hover:border-emerald-500/40 transition-all group relative">
+    <div className="m-panel bg-zinc-900/80 border border-zinc-800 rounded-xl p-3.5 flex flex-col justify-between hover:border-emerald-500/40 transition-all group relative">
       <div>
         {/* Header row */}
         <div className="flex items-start justify-between">
@@ -308,10 +316,12 @@ export const BucketCard: React.FC<BucketCardProps> = ({
       {/* Card Footer Quick Action */}
       <div className="mt-4 pt-3 border-t border-zinc-800/80 flex items-center justify-between">
         <span className="text-[11px] text-zinc-400 font-mono">
-          {remaining > 0 ? `${formatCurrency(remaining)} to target` : 'Fully funded!'}
+          {remaining > 0
+            ? `${formatCurrency(remaining)} to target`
+            : "Fully funded!"}
         </span>
         <button
-          onClick={() => onQuickAction(bucket, 'savings_deposit')}
+          onClick={() => onQuickAction(bucket, "savings_deposit")}
           className="flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 transition-colors cursor-pointer"
         >
           <Plus className="w-3 h-3" />

@@ -1,17 +1,17 @@
-import React from 'react';
-import { 
-  X, 
-  FileText, 
-  Calendar, 
-  Flame, 
-  CheckCircle, 
-  AlertTriangle, 
-  TrendingUp, 
+import React from "react";
+import {
+  X,
+  FileText,
+  Calendar,
+  Flame,
+  CheckCircle,
+  AlertTriangle,
+  TrendingUp,
   ArrowRight,
-  ShieldCheck
-} from 'lucide-react';
-import { Bucket, Transaction, UserIncomeProfile } from '../types';
-import { generateWeeklyDigest, formatCurrency } from '../lib/insights';
+  ShieldCheck,
+} from "lucide-react";
+import { Bucket, Transaction, UserIncomeProfile } from "../types";
+import { generateWeeklyDigest, formatCurrency } from "../lib/insights";
 
 interface WeeklyDigestModalProps {
   isOpen: boolean;
@@ -34,21 +34,21 @@ export const WeeklyDigestModal: React.FC<WeeklyDigestModalProps> = ({
 
   const getStatusBadge = (status: typeof digest.status) => {
     switch (status) {
-      case 'Healthy':
+      case "Healthy":
         return (
           <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
             <CheckCircle className="w-3.5 h-3.5" />
             Healthy Velocity
           </span>
         );
-      case 'Caution':
+      case "Caution":
         return (
           <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-amber-500/15 text-amber-400 border border-amber-500/30">
             <AlertTriangle className="w-3.5 h-3.5" />
             Caution (Burn Pace Elevated)
           </span>
         );
-      case 'Attention Needed':
+      case "Attention Needed":
       default:
         return (
           <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-rose-500/15 text-rose-400 border border-rose-500/30">
@@ -60,7 +60,7 @@ export const WeeklyDigestModal: React.FC<WeeklyDigestModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-xs">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/30 backdrop-blur-xs">
       <div className="bg-zinc-950 border border-zinc-800 rounded-2xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-150">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-800 bg-zinc-950">
@@ -73,7 +73,8 @@ export const WeeklyDigestModal: React.FC<WeeklyDigestModalProps> = ({
                 Weekly Financial Health Digest
               </h3>
               <p className="text-xs text-zinc-400 mt-0.5">
-                Deterministic rule-based Sunday finance briefing • Generated offline
+                Deterministic rule-based Sunday finance briefing • Generated
+                offline
               </p>
             </div>
           </div>
@@ -93,7 +94,8 @@ export const WeeklyDigestModal: React.FC<WeeklyDigestModalProps> = ({
               <div className="flex items-center gap-2 text-zinc-300 font-medium">
                 <Calendar className="w-4 h-4 text-emerald-400" />
                 <span>
-                  Week {digest.weekNumber} • {digest.monthName} ({digest.generatedDate})
+                  Week {digest.weekNumber} • {digest.monthName} (
+                  {digest.generatedDate})
                 </span>
               </div>
               {getStatusBadge(digest.status)}
@@ -101,7 +103,9 @@ export const WeeklyDigestModal: React.FC<WeeklyDigestModalProps> = ({
 
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-3 border-t border-zinc-800 text-xs font-mono">
               <div>
-                <span className="text-zinc-500 text-[10px] uppercase block">Month Progress</span>
+                <span className="text-zinc-500 text-[10px] uppercase block">
+                  Month Progress
+                </span>
                 <span className="text-zinc-200 font-bold text-sm">
                   {digest.monthProgressPercent}%
                 </span>
@@ -110,7 +114,9 @@ export const WeeklyDigestModal: React.FC<WeeklyDigestModalProps> = ({
                 </span>
               </div>
               <div>
-                <span className="text-zinc-500 text-[10px] uppercase block">Budget Spent</span>
+                <span className="text-zinc-500 text-[10px] uppercase block">
+                  Budget Spent
+                </span>
                 <span className="text-zinc-200 font-bold text-sm">
                   {digest.spentPercent}%
                 </span>
@@ -119,8 +125,12 @@ export const WeeklyDigestModal: React.FC<WeeklyDigestModalProps> = ({
                 </span>
               </div>
               <div>
-                <span className="text-zinc-500 text-[10px] uppercase block">Hot Envelopes</span>
-                <span className={`font-bold text-sm ${digest.hotBuckets.length > 0 ? 'text-amber-400' : 'text-emerald-400'}`}>
+                <span className="text-zinc-500 text-[10px] uppercase block">
+                  Hot Envelopes
+                </span>
+                <span
+                  className={`font-bold text-sm ${digest.hotBuckets.length > 0 ? "text-amber-400" : "text-emerald-400"}`}
+                >
                   {digest.hotBuckets.length}
                 </span>
                 <span className="text-[10px] text-zinc-400 block">
@@ -128,7 +138,9 @@ export const WeeklyDigestModal: React.FC<WeeklyDigestModalProps> = ({
                 </span>
               </div>
               <div>
-                <span className="text-zinc-500 text-[10px] uppercase block">Savings Goals</span>
+                <span className="text-zinc-500 text-[10px] uppercase block">
+                  Savings Goals
+                </span>
                 <span className="text-emerald-400 font-bold text-sm">
                   {digest.savingsHighlights.length}
                 </span>
@@ -168,9 +180,12 @@ export const WeeklyDigestModal: React.FC<WeeklyDigestModalProps> = ({
                     className="bg-amber-950/20 border border-amber-500/30 rounded-xl p-3 flex items-center justify-between"
                   >
                     <div>
-                      <span className="font-semibold text-zinc-100">{b.name}</span>
+                      <span className="font-semibold text-zinc-100">
+                        {b.name}
+                      </span>
                       <div className="text-[11px] text-zinc-400 mt-0.5 font-mono">
-                        Spent {formatCurrency(b.spent)} of {formatCurrency(b.planned)} allowance
+                        Spent {formatCurrency(b.spent)} of{" "}
+                        {formatCurrency(b.planned)} allowance
                       </div>
                     </div>
                     <div className="text-right font-mono">
@@ -232,7 +247,10 @@ export const WeeklyDigestModal: React.FC<WeeklyDigestModalProps> = ({
             </h4>
             <div className="bg-emerald-950/20 border border-emerald-500/30 rounded-xl p-4 space-y-2.5">
               {digest.recommendations.map((rec, idx) => (
-                <div key={idx} className="flex items-start gap-2.5 text-zinc-300">
+                <div
+                  key={idx}
+                  className="flex items-start gap-2.5 text-zinc-300"
+                >
                   <ArrowRight className="w-3.5 h-3.5 text-emerald-400 shrink-0 mt-0.5" />
                   <span className="leading-relaxed">{rec}</span>
                 </div>
