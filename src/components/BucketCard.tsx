@@ -54,7 +54,8 @@ export const BucketCard: React.FC<BucketCardProps> = ({
     const spentRatio = planned > 0 ? spent / planned : 0;
     const spentPercent = Math.min(100, Math.round(spentRatio * 100));
     const isExceeded = spent > planned;
-    const isHot = !isExceeded && spentRatio > monthProgressRatio + 0.15 && spent > 0;
+    const isHot =
+      !bucket.isFixed && !isExceeded && spentRatio > monthProgressRatio + 0.15 && spent > 0;
 
     return (
       <div className="bg-zinc-900/90 border border-zinc-800 rounded-xl p-4 flex flex-col justify-between hover:border-zinc-700 transition-all group relative">
@@ -87,6 +88,10 @@ export const BucketCard: React.FC<BucketCardProps> = ({
               {isExceeded ? (
                 <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-rose-500/10 border border-rose-500/30 text-rose-400 font-semibold">
                   Exceeded
+                </span>
+              ) : bucket.isFixed ? (
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-indigo-500/10 border border-indigo-500/30 text-indigo-400 font-semibold">
+                  Fixed
                 </span>
               ) : isHot ? (
                 <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-amber-500/10 border border-amber-500/30 text-amber-400 font-semibold">

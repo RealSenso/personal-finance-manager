@@ -47,7 +47,7 @@ export function optimizeSavingsDistribution(
   buckets: Bucket[],
   incomeProfile: UserIncomeProfile,
   strategy: SavingsStrategy = 'balanced_accelerator',
-  currentDate: Date = new Date(2026, 8, 3) // Default Sep 3, 2026
+  currentDate: Date = new Date()
 ): SmartSavingsOptimizationResult {
   const totalMonthlyIncome =
     incomeProfile.stipend +

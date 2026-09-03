@@ -43,6 +43,7 @@ export const BucketFormModal: React.FC<BucketFormModalProps> = ({
   const [category, setCategory] = useState('General');
   const [color, setColor] = useState('#10b981');
   const [notes, setNotes] = useState('');
+  const [isFixed, setIsFixed] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
 
   useEffect(() => {
@@ -55,6 +56,7 @@ export const BucketFormModal: React.FC<BucketFormModalProps> = ({
       setCategory(bucketToEdit.category || 'General');
       setColor(bucketToEdit.color || '#10b981');
       setNotes(bucketToEdit.notes || '');
+      setIsFixed(!!bucketToEdit.isFixed);
     } else {
       setName('');
       setType('recurring');
@@ -64,6 +66,7 @@ export const BucketFormModal: React.FC<BucketFormModalProps> = ({
       setCategory('General');
       setColor('#10b981');
       setNotes('');
+      setIsFixed(false);
     }
   }, [bucketToEdit, isOpen]);
 
@@ -92,6 +95,7 @@ export const BucketFormModal: React.FC<BucketFormModalProps> = ({
         color,
         icon: type === 'recurring' ? 'wallet' : 'piggy-bank',
         notes: notes.trim(),
+        isFixed: type === 'recurring' ? isFixed : undefined,
       },
       bucketToEdit?.id
     );
@@ -242,6 +246,23 @@ export const BucketFormModal: React.FC<BucketFormModalProps> = ({
               </div>
             )}
           </div>
+
+          {/* Fixed bill toggle (recurring only) */}
+          {type === 'recurring' && (
+            <label className="flex items-start gap-2.5 p-2.5 rounded-xl bg-zinc-900 border border-zinc-800 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={isFixed}
+                onChange={(e) => setIsFixed(e.target.checked)}
+                className="mt-0.5 accent-emerald-500"
+              />
+              <span className="text-[11px] text-zinc-300 leading-relaxed">
+                <span className="font-semibold text-zinc-200">Fixed bill</span> (subscription, rent,
+                recharge). Paid in full every month — excluded from the day-to-day spending budget
+                and never flagged as "running hot" unless it exceeds its planned amount.
+              </span>
+            </label>
+          )}
 
           {/* Target Amount & Accumulated (if savings goal) */}
           {type === 'savings_goal' && (

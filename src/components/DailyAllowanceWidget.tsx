@@ -1,45 +1,45 @@
 import React, { useState } from 'react';
-import { 
-  Flame, 
-  Sparkles, 
-  TrendingDown, 
-  TrendingUp, 
-  Calendar, 
-  ArrowRight,
-  HelpCircle,
-  Clock,
-  ShieldCheck,
-  AlertTriangle
-} from 'lucide-react';
+import { Flame, Sparkles, Clock, PiggyBank, ArrowRight } from 'lucide-react';
 import { DailyExpenseAllowance, simulateTomorrowAllowance } from '../lib/dailyAllowance';
 import { formatCurrency } from '../lib/insights';
 
 interface DailyAllowanceWidgetProps {
   allowance: DailyExpenseAllowance;
-  onOpenDetails?: () => void;
+  onSweepToGoals?: (amount: number) => void;
 }
 
 export const DailyAllowanceWidget: React.FC<DailyAllowanceWidgetProps> = ({
   allowance,
-  onOpenDetails,
+  onSweepToGoals,
 }) => {
   const [simulatedSpend, setSimulatedSpend] = useState<string>('500');
   const [showSimulator, setShowSimulator] = useState<boolean>(false);
 
   const numSimulated = Math.max(0, parseFloat(simulatedSpend) || 0);
   const simulation = simulateTomorrowAllowance(
-    allowance.remainingBudget,
+    allowance.remainingSpendable,
     allowance.remainingDays,
     numSimulated
   );
 
+  const paceLabel =
+    allowance.paceStatus === 'ahead'
+      ? 'Ahead of pace'
+      : allowance.paceStatus === 'behind'
+        ? 'Spending fast'
+        : 'On track';
+  const paceTone =
+    allowance.paceStatus === 'ahead'
+      ? 'text-emerald-400'
+      : allowance.paceStatus === 'behind'
+        ? 'text-amber-400'
+        : 'text-zinc-400';
+
   return (
     <div className="bg-gradient-to-br from-zinc-900 via-zinc-900 to-zinc-950 border border-zinc-800/90 rounded-2xl p-4 sm:p-5 shadow-lg relative overflow-hidden">
-      {/* Subtle ambient accent glow */}
       <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-500/5 rounded-full blur-3xl pointer-events-none" />
 
       <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 relative z-10">
-        {/* Left Side: Daily Limit Hero */}
         <div className="flex items-start sm:items-center gap-4">
           <div className="w-12 h-12 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 shrink-0 shadow-inner">
             <Sparkles className="w-6 h-6" />
@@ -48,29 +48,30 @@ export const DailyAllowanceWidget: React.FC<DailyAllowanceWidgetProps> = ({
           <div>
             <div className="flex items-center gap-2">
               <span className="text-xs font-semibold tracking-wide uppercase text-emerald-400">
-                Smart Daily Expense Allowance
+                Safe Daily Spend
               </span>
               <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-zinc-800 text-zinc-300 border border-zinc-700/60">
                 {allowance.remainingDays} days left
               </span>
+              <span className={`text-[10px] font-mono ${paceTone}`}>{paceLabel}</span>
             </div>
 
             <div className="flex items-baseline gap-2.5 mt-1">
               <span className="text-2xl sm:text-3xl font-extrabold text-white font-mono tracking-tight">
                 {formatCurrency(allowance.safeDailyAllowance)}
               </span>
-              <span className="text-xs font-medium text-zinc-400">/ day safe spend</span>
+              <span className="text-xs font-medium text-zinc-400">/ day</span>
             </div>
 
             <p className="text-xs text-zinc-400 mt-1">
-              Based on {formatCurrency(allowance.remainingBudget)} remaining across recurring envelopes for {allowance.remainingDays} days.
+              {formatCurrency(allowance.remainingSpendable)} left to spend after setting aside{' '}
+              {formatCurrency(allowance.savingsReserve)} for goals and{' '}
+              {formatCurrency(allowance.fixedCommitments)} for fixed bills.
             </p>
           </div>
         </div>
 
-        {/* Middle & Right: Today's status & Quick actions */}
         <div className="flex flex-wrap items-center gap-3 lg:justify-end">
-          {/* Today's Spend Chip */}
           <div className="bg-zinc-950/70 border border-zinc-800 rounded-xl px-3.5 py-2 flex items-center gap-3">
             <div>
               <div className="text-[10px] text-zinc-400 uppercase tracking-wider font-medium">
@@ -100,7 +101,6 @@ export const DailyAllowanceWidget: React.FC<DailyAllowanceWidgetProps> = ({
             </div>
           </div>
 
-          {/* Quick Simulator Toggle Button */}
           <button
             type="button"
             onClick={() => setShowSimulator(!showSimulator)}
@@ -116,7 +116,32 @@ export const DailyAllowanceWidget: React.FC<DailyAllowanceWidgetProps> = ({
         </div>
       </div>
 
-      {/* Interactive What-If Spend Simulator Bar */}
+      {/* Underspend surplus → goals */}
+      {allowance.underspendPool >= 100 && (
+        <div className="mt-4 pt-4 border-t border-zinc-800/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-start gap-2.5">
+            <PiggyBank className="w-4 h-4 text-emerald-400 mt-0.5 shrink-0" />
+            <p className="text-xs text-zinc-300">
+              You're <span className="font-semibold text-emerald-400">
+                {formatCurrency(allowance.underspendPool)}
+              </span>{' '}
+              under your steady pace of {formatCurrency(allowance.baselineDaily)}/day so far.
+              Move it to your goals before it drifts back into spending.
+            </p>
+          </div>
+          {onSweepToGoals && (
+            <button
+              type="button"
+              onClick={() => onSweepToGoals(allowance.underspendPool)}
+              className="shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-zinc-950 bg-emerald-400 hover:bg-emerald-300 transition-colors cursor-pointer"
+            >
+              Sweep {formatCurrency(allowance.underspendPool)} to goals
+              <ArrowRight className="w-3.5 h-3.5" />
+            </button>
+          )}
+        </div>
+      )}
+
       {showSimulator && (
         <div className="mt-4 pt-4 border-t border-zinc-800/80 animate-in fade-in slide-in-from-top-2 duration-150">
           <div className="bg-zinc-950/80 border border-zinc-800 rounded-xl p-3.5 sm:p-4">
@@ -124,14 +149,13 @@ export const DailyAllowanceWidget: React.FC<DailyAllowanceWidgetProps> = ({
               <div>
                 <div className="text-xs font-semibold text-zinc-200 flex items-center gap-1.5">
                   <Flame className="w-4 h-4 text-amber-400" />
-                  <span>Interactive Daily Spend Impact</span>
+                  <span>Daily Spend Impact</span>
                 </div>
                 <p className="text-[11px] text-zinc-400 mt-0.5">
-                  See how spending a specific amount today changes your safe daily allowance for tomorrow and beyond.
+                  How spending a set amount today changes tomorrow's safe allowance.
                 </p>
               </div>
 
-              {/* Input */}
               <div className="flex items-center gap-2">
                 <span className="text-xs text-zinc-400">If I spend</span>
                 <div className="relative w-28">
@@ -148,7 +172,6 @@ export const DailyAllowanceWidget: React.FC<DailyAllowanceWidgetProps> = ({
               </div>
             </div>
 
-            {/* Simulated Outcome */}
             <div className="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-xs pt-3 border-t border-zinc-800/60 font-mono">
               <div className="p-2.5 rounded-lg bg-zinc-900/90 border border-zinc-800">
                 <span className="text-zinc-400 block text-[10px]">Today's Remaining</span>
@@ -175,9 +198,9 @@ export const DailyAllowanceWidget: React.FC<DailyAllowanceWidgetProps> = ({
               </div>
 
               <div className="p-2.5 rounded-lg bg-zinc-900/90 border border-zinc-800">
-                <span className="text-zinc-400 block text-[10px]">Month-End Recurring Balance</span>
+                <span className="text-zinc-400 block text-[10px]">Month-End Spendable Left</span>
                 <span className="text-zinc-200 font-bold text-sm">
-                  {formatCurrency(Math.max(0, allowance.remainingBudget - numSimulated))}
+                  {formatCurrency(Math.max(0, allowance.remainingSpendable - numSimulated))}
                 </span>
               </div>
             </div>

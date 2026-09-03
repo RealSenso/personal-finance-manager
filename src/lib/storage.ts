@@ -7,14 +7,13 @@ const STORAGE_KEYS = {
   INCOME: 'pfm_income_v1',
   INITIALIZED: 'pfm_initialized_v1',
   LAST_SAVED: 'pfm_last_saved_v1',
-  SNAPSHOTS: 'pfm_snapshots_history_v1',
 };
 
-// Initial default state matching user's exact ₹22,400 zero-sum allocation
 export const DEFAULT_INCOME: UserIncomeProfile = {
   stipend: 12400,
   extra: 10000,
   otherStreams: [],
+  savingsRatePercent: 25,
 };
 
 export const DEFAULT_BUCKETS: Bucket[] = [
@@ -28,6 +27,7 @@ export const DEFAULT_BUCKETS: Bucket[] = [
     icon: 'bot',
     category: 'Subscriptions',
     notes: 'Claude Pro AI subscription fixed expense',
+    isFixed: true,
   },
   {
     id: 'b-mobile',
@@ -39,6 +39,7 @@ export const DEFAULT_BUCKETS: Bucket[] = [
     icon: 'smartphone',
     category: 'Utilities',
     notes: 'Monthly data & calling plan',
+    isFixed: true,
   },
   {
     id: 'b-fun',
@@ -285,7 +286,14 @@ function recordSaveTimestamp(): void {
 export function loadIncomeProfile(): UserIncomeProfile {
   try {
     const raw = localStorage.getItem(STORAGE_KEYS.INCOME);
-    if (raw) return JSON.parse(raw);
+    if (raw) {
+      const parsed = JSON.parse(raw) as UserIncomeProfile;
+      // Migrate older profiles that predate the savings-rate field.
+      if (typeof parsed.savingsRatePercent !== 'number') {
+        parsed.savingsRatePercent = DEFAULT_INCOME.savingsRatePercent;
+      }
+      return parsed;
+    }
   } catch (e) {
     console.error('Failed to load income from storage', e);
   }

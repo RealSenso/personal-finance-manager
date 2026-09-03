@@ -30,6 +30,9 @@ import {
 } from './lib/storage';
 import { evaluateFinancialInsights, formatCurrency } from './lib/insights';
 import { exportFullJsonBackup } from './lib/csvParser';
+import { useCloudSync } from './lib/useCloudSync';
+import { SyncButton } from './components/SyncButton';
+import type { AppSnapshot } from './types';
 import { Header } from './components/Header';
 import { DashboardStats } from './components/DashboardStats';
 import { InsightsBanner } from './components/InsightsBanner';
@@ -75,9 +78,19 @@ export default function App() {
     }, 3500);
   };
 
-  // Current selected month: '2026-09'
-  const [currentMonth, setCurrentMonth] = useState<string>('2026-09');
-  const availableMonths = useMemo(() => ['2026-09', '2026-08', '2026-07'], []);
+  // Current real calendar month, e.g. '2026-09'
+  const thisMonth = useMemo(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+  }, []);
+  const [currentMonth, setCurrentMonth] = useState<string>(thisMonth);
+
+  // Months that actually have data, plus the current month, newest first.
+  const availableMonths = useMemo(() => {
+    const set = new Set<string>([thisMonth, currentMonth]);
+    for (const tx of transactions) set.add(tx.date.slice(0, 7));
+    return Array.from(set).sort((a, b) => b.localeCompare(a));
+  }, [transactions, thisMonth, currentMonth]);
 
   // Modal states
   const [isAddExpenseOpen, setIsAddExpenseOpen] = useState(false);
@@ -195,6 +208,62 @@ export default function App() {
     } else {
       showToast(`Expense of ${formatCurrency(newTx.amount)} logged`);
     }
+
+    // Jump the dashboard to the month the transaction belongs to so its
+    // effect on the budget is immediately visible.
+    const txMonth = newTx.date.slice(0, 7);
+    if (txMonth !== currentMonth) setCurrentMonth(txMonth);
+  };
+
+  // Distribute an underspend surplus across incomplete savings goals (weighted by
+  // how much each goal still needs), logging a deposit per goal.
+  const handleSweepToGoals = (amount: number) => {
+    const sweep = Math.floor(amount);
+    if (sweep < 1) return;
+    const goals = buckets.filter(
+      (b) => b.type === 'savings_goal' && !b.isArchived && b.currentBalance < (b.targetAmount || 0)
+    );
+    if (goals.length === 0) {
+      showToast('No open savings goals to sweep into', 'info');
+      return;
+    }
+    const needs = goals.map((g) => Math.max(1, (g.targetAmount || 0) - g.currentBalance));
+    const totalNeed = needs.reduce((s, n) => s + n, 0);
+
+    const today = new Date().toISOString().slice(0, 10);
+    const deposits: Transaction[] = [];
+    let allocated = 0;
+    goals.forEach((g, i) => {
+      const share =
+        i === goals.length - 1
+          ? sweep - allocated
+          : Math.round((sweep * needs[i]) / totalNeed);
+      if (share <= 0) return;
+      allocated += share;
+      deposits.push({
+        id: `sweep-${Date.now()}-${i}`,
+        bucketId: g.id,
+        amount: share,
+        type: 'savings_deposit',
+        date: today,
+        note: 'Swept from daily-spend surplus',
+        merchant: 'Auto Sweep',
+        source: 'manual',
+        createdAt: new Date().toISOString(),
+      });
+    });
+    if (deposits.length === 0) return;
+
+    const depById = new Map(deposits.map((d) => [d.bucketId, d.amount]));
+    const updatedTxs = [...deposits, ...transactions];
+    const updatedBuckets = buckets.map((b) =>
+      depById.has(b.id) ? { ...b, currentBalance: b.currentBalance + (depById.get(b.id) || 0) } : b
+    );
+    setTransactions(updatedTxs);
+    saveTransactions(updatedTxs);
+    setBuckets(updatedBuckets);
+    saveBuckets(updatedBuckets);
+    showToast(`Swept ${formatCurrency(allocated)} into ${deposits.length} goal${deposits.length > 1 ? 's' : ''}`);
   };
 
   const handleBulkImportTransactions = (newTxsData: Omit<Transaction, 'id'>[]) => {
@@ -341,6 +410,10 @@ export default function App() {
       setIsBucketFormOpen(true);
     } else if (insight.actionType === 'open_smart_savings') {
       setIsSmartSavingsOpen(true);
+    } else if (insight.actionType === 'sweep_to_goals') {
+      const pool = Number((insight.metric || '').replace(/[^\d]/g, '')) || 0;
+      if (pool > 0) handleSweepToGoals(pool);
+      else setIsSmartSavingsOpen(true);
     }
   };
 
@@ -376,12 +449,27 @@ export default function App() {
     saveKeywordRules(DEFAULT_KEYWORD_RULES);
   };
 
-  // Live Rule-based Insights computed dynamically from data
-  const insights = useMemo(() => {
-    // September 3, 2026
-    const simulatedDate = new Date(2026, 8, 3);
-    return evaluateFinancialInsights(buckets, transactions, incomeProfile, simulatedDate);
-  }, [buckets, transactions, incomeProfile]);
+  // Live rule-based insights, recomputed whenever any underlying data changes.
+  const insights = useMemo(
+    () => evaluateFinancialInsights(buckets, transactions, incomeProfile, new Date()),
+    [buckets, transactions, incomeProfile]
+  );
+
+  // --- Active multi-device sync (Firebase, optional) ---
+  const applyRemote = (snap: AppSnapshot) => {
+    setIncomeProfile(snap.income);
+    saveIncomeProfile(snap.income);
+    setBuckets(snap.buckets);
+    saveBuckets(snap.buckets);
+    setTransactions(snap.transactions);
+    saveTransactions(snap.transactions);
+    setKeywordRules(snap.rules);
+    saveKeywordRules(snap.rules);
+  };
+  const cloud = useCloudSync({
+    snapshot: { income: incomeProfile, buckets, transactions, rules: keywordRules },
+    onRemote: applyRemote,
+  });
 
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-100 flex flex-col font-sans selection:bg-emerald-500/30 selection:text-emerald-200 relative">
@@ -423,6 +511,15 @@ export default function App() {
         onOpenRules={() => setIsRulesOpen(true)}
         onOpenStorageManager={() => setIsStorageManagerOpen(true)}
         onOpenExport={() => setIsExportOpen(true)}
+        syncButton={
+          <SyncButton
+            enabled={cloud.enabled}
+            status={cloud.status}
+            email={cloud.user?.email ?? null}
+            onSignIn={cloud.signIn}
+            onSignOut={cloud.signOut}
+          />
+        }
       />
 
       {/* Main Dashboard Layout */}
@@ -434,6 +531,7 @@ export default function App() {
           transactions={transactions}
           currentMonth={currentMonth}
           onUpdateIncome={handleUpdateIncome}
+          onSweepToGoals={handleSweepToGoals}
         />
 
         {/* Rule-Based Insights & Alert Feed */}

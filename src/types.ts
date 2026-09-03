@@ -6,12 +6,16 @@ export interface Bucket {
   type: BucketType;
   plannedMonthly: number; // For recurring: monthly allowance. For savings: planned monthly deposit.
   targetAmount?: number; // Only for savings_goal
-  currentBalance: number; // For savings_goal: accumulated total. For recurring: rollover/current balance if applicable.
+  currentBalance: number; // For savings_goal: accumulated total.
   color: string;
   icon: string;
   category: string;
   notes?: string;
   isArchived?: boolean;
+  // Recurring only: a fixed bill (subscription, rent, recharge) that is expected to be
+  // paid in full every month. Fixed buckets are excluded from day-to-day spend budgeting
+  // and never raise "running hot" pace warnings unless they exceed their planned amount.
+  isFixed?: boolean;
 }
 
 export type TransactionType = 'expense' | 'savings_deposit' | 'income';
@@ -45,13 +49,15 @@ export interface IncomeStream {
   id: string;
   name: string;
   amount: number;
-  isRecurring: boolean;
 }
 
 export interface UserIncomeProfile {
-  stipend: number; // ₹12,400
-  extra: number;   // ₹10,000
+  stipend: number;
+  extra: number;
   otherStreams?: IncomeStream[];
+  // Share of total monthly income set aside for savings goals BEFORE the day-to-day
+  // spending budget is computed. Default 25.
+  savingsRatePercent: number;
 }
 
 export interface ParsedCsvRow {
@@ -76,7 +82,7 @@ export interface RuleInsight {
   message: string;
   metric?: string;
   actionText?: string;
-  actionType?: 'view_bucket' | 'adjust_budget' | 'reallocate' | 'deposit' | 'open_smart_savings';
+  actionType?: 'view_bucket' | 'adjust_budget' | 'reallocate' | 'deposit' | 'open_smart_savings' | 'sweep_to_goals';
   targetBucketId?: string;
 }
 
@@ -98,18 +104,10 @@ export interface WeeklyDigestData {
   recommendations: string[];
 }
 
-export interface MonthSnapshot {
-  month: string; // YYYY-MM
-  totalIncome: number;
-  totalPlanned: number;
-  totalSpent: number;
-  totalSaved: number;
-  unallocated: number;
-  bucketBreakdown: {
-    bucketId: string;
-    bucketName: string;
-    type: BucketType;
-    planned: number;
-    actual: number;
-  }[];
+// Full app state, used for cloud sync (one Firestore document per user).
+export interface AppSnapshot {
+  income: UserIncomeProfile;
+  buckets: Bucket[];
+  transactions: Transaction[];
+  rules: KeywordRule[];
 }

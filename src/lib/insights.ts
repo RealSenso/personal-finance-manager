@@ -154,59 +154,16 @@ export function evaluateFinancialInsights(
   const monthProgressRatio = dayOfMonth / totalDaysInMonth;
   const monthProgressPercent = Math.round(monthProgressRatio * 100);
 
-  // Total Income
-  const totalIncome =
-    incomeProfile.stipend +
-    incomeProfile.extra +
-    (incomeProfile.otherStreams || []).reduce((s, st) => s + st.amount, 0);
-
-  // Total Planned Allocations across both recurring and savings goals
-  const totalPlannedAllocations = buckets
-    .filter((b) => !b.isArchived)
-    .reduce((sum, b) => sum + b.plannedMonthly, 0);
-
-  // 1. RULE: Total Allocation vs Total Income (Zero-Sum check)
-  const unallocated = totalIncome - totalPlannedAllocations;
-  if (unallocated > 0) {
-    insights.push({
-      id: 'ins-unallocated-positive',
-      type: 'warning',
-      title: 'Unallocated Monthly Income',
-      message: `You have ${formatCurrency(unallocated)} of unallocated income this month (${formatCurrency(totalIncome)} income vs ${formatCurrency(totalPlannedAllocations)} budgeted). Give every rupee a job by allocating to your savings goals or buffer.`,
-      metric: `${formatCurrency(unallocated)} free`,
-      actionText: 'Allocate Funds',
-      actionType: 'adjust_budget',
-    });
-  } else if (unallocated < 0) {
-    insights.push({
-      id: 'ins-unallocated-negative',
-      type: 'alert',
-      title: 'Over-Allocated Budget',
-      message: `Your total planned allocations (${formatCurrency(totalPlannedAllocations)}) exceed your total monthly income (${formatCurrency(totalIncome)}) by ${formatCurrency(Math.abs(unallocated))}. You are operating at a deficit.`,
-      metric: `-${formatCurrency(Math.abs(unallocated))}`,
-      actionText: 'Rebalance Envelopes',
-      actionType: 'adjust_budget',
-    });
-  } else {
-    insights.push({
-      id: 'ins-unallocated-zero',
-      type: 'success',
-      title: 'Zero-Sum Budget Balanced',
-      message: `Perfect zero-sum allocation. 100% of your ${formatCurrency(totalIncome)} monthly income has an intentional destination. Unallocated balance is exactly ₹0.`,
-      metric: '₹0 Unallocated',
-    });
-  }
-
-  // 2. RULE: Mid-Month Pacing for Recurring Buckets
+  // 1. RULE: Mid-month pacing for flexible (non-fixed) recurring envelopes.
+  // Fixed bills (subscriptions, rent, recharge) are meant to be paid in full early in
+  // the month, so they only warn when they actually exceed their planned amount.
   const recurringBuckets = buckets.filter((b) => b.type === 'recurring' && !b.isArchived);
   for (const bucket of recurringBuckets) {
     const spent = getBucketSpendForMonth(bucket.id, transactions, monthStr);
     const planned = bucket.plannedMonthly;
-
     if (planned <= 0) continue;
 
-    const spendRatio = spent / planned;
-    const spendPercent = Math.round(spendRatio * 100);
+    const spendPercent = Math.round((spent / planned) * 100);
 
     if (spent > planned) {
       const overBy = spent - planned;
@@ -215,20 +172,24 @@ export function evaluateFinancialInsights(
         type: 'alert',
         bucketId: bucket.id,
         title: `${bucket.name} Budget Exceeded`,
-        message: `You've spent ${formatCurrency(spent)} of your planned ${formatCurrency(planned)} (${spendPercent}%), exceeding the limit by ${formatCurrency(overBy)} with ${totalDaysInMonth - dayOfMonth} days remaining.`,
+        message: `You've spent ${formatCurrency(spent)} of your planned ${formatCurrency(planned)} (${spendPercent}%), exceeding it by ${formatCurrency(overBy)} with ${totalDaysInMonth - dayOfMonth} days left.`,
         metric: `${spendPercent}% used`,
         actionText: 'View Transactions',
         actionType: 'view_bucket',
       });
-    } else if (spent > 0 && spendRatio > monthProgressRatio + 0.15) {
-      // Pacing warning
+      continue;
+    }
+
+    if (bucket.isFixed) continue; // fixed bill, still within plan — nothing to flag
+
+    if (spent > 0 && spent / planned > monthProgressRatio + 0.15) {
       const projectedSpend = Math.round((spent / dayOfMonth) * totalDaysInMonth);
       insights.push({
         id: `ins-pace-${bucket.id}`,
         type: 'warning',
         bucketId: bucket.id,
         title: `${bucket.name} Running Hot`,
-        message: `You've used ${spendPercent}% of this bucket (${formatCurrency(spent)} / ${formatCurrency(planned)}), but only ${monthProgressPercent}% of the month has passed (Day ${dayOfMonth}/${totalDaysInMonth}). At this burn rate, projected month-end spend is ${formatCurrency(projectedSpend)}.`,
+        message: `You've used ${spendPercent}% of this envelope (${formatCurrency(spent)} / ${formatCurrency(planned)}) but only ${monthProgressPercent}% of the month has passed (Day ${dayOfMonth}/${totalDaysInMonth}). At this rate you'd finish the month at ${formatCurrency(projectedSpend)}.`,
         metric: `Burn: ${spendPercent}% vs ${monthProgressPercent}% day`,
         actionText: 'Review Bucket',
         actionType: 'view_bucket',
@@ -278,7 +239,7 @@ export function evaluateFinancialInsights(
   const m2Str = `${prevMonth2.getFullYear()}-${String(prevMonth2.getMonth() + 2).padStart(2, '0')}`;
 
   for (const bucket of recurringBuckets) {
-    if (bucket.plannedMonthly >= 1000) {
+    if (!bucket.isFixed && bucket.plannedMonthly >= 1000) {
       const spendM1 = getBucketSpendForMonth(bucket.id, transactions, m1Str);
       const spendM2 = getBucketSpendForMonth(bucket.id, transactions, m2Str);
       const totalIdleSpend = spendM1 + spendM2;
@@ -304,25 +265,36 @@ export function evaluateFinancialInsights(
     }
   }
 
-  // 5. RULE: Smart Daily Expense Allowance Assessment
-  const dailyAllowanceData = calculateDailyAllowance(buckets, transactions, monthStr, currentDate);
-  if (dailyAllowanceData.todayStatus === 'exceeded') {
+  // 5. RULE: Smart daily spending allowance (income - savings reserve - fixed bills).
+  const da = calculateDailyAllowance(buckets, transactions, incomeProfile, monthStr, currentDate);
+  if (da.todayStatus === 'exceeded') {
     insights.push({
       id: 'ins-daily-allowance-exceeded',
       type: 'alert',
-      title: 'Daily Expense Allowance Exceeded Today',
-      message: `You've spent ${formatCurrency(dailyAllowanceData.todaySpent)} today against your safe daily target of ${formatCurrency(dailyAllowanceData.safeDailyAllowance)}/day. Your daily allowance for the remaining ${dailyAllowanceData.remainingDays - 1} days will adjust to ensure you stay within your monthly budget.`,
-      metric: `${formatCurrency(dailyAllowanceData.todaySpent)} spent today`,
-      actionText: 'Adjust Envelopes',
-      actionType: 'adjust_budget',
+      title: 'Over Your Daily Allowance Today',
+      message: `You've spent ${formatCurrency(da.todaySpent)} today against a safe target of ${formatCurrency(da.safeDailyAllowance)}/day. Tomorrow's allowance drops to keep you inside this month's ${formatCurrency(da.monthlySpendable)} spendable budget.`,
+      metric: `${formatCurrency(da.todaySpent)} spent today`,
     });
-  } else if (dailyAllowanceData.safeDailyAllowance > 0 && dailyAllowanceData.remainingDays > 5) {
+  } else if (da.safeDailyAllowance > 0 && da.remainingDays > 3) {
     insights.push({
       id: 'ins-daily-allowance-on-track',
       type: 'info',
-      title: 'Daily Spending Allowance Active',
-      message: `Your safe spending allowance is ${formatCurrency(dailyAllowanceData.safeDailyAllowance)}/day across remaining recurring envelopes (${formatCurrency(dailyAllowanceData.remainingBudget)} remaining over ${dailyAllowanceData.remainingDays} days). You have ${formatCurrency(Math.max(0, dailyAllowanceData.todayRemaining))} left for today.`,
-      metric: `${formatCurrency(dailyAllowanceData.safeDailyAllowance)}/day safe`,
+      title: 'Daily Spending Allowance',
+      message: `After reserving ${formatCurrency(da.savingsReserve)} for goals and ${formatCurrency(da.fixedCommitments)} for fixed bills, you have ${formatCurrency(da.remainingSpendable)} to spend over ${da.remainingDays} days — about ${formatCurrency(da.safeDailyAllowance)}/day. ${formatCurrency(Math.max(0, da.todayRemaining))} left for today.`,
+      metric: `${formatCurrency(da.safeDailyAllowance)}/day safe`,
+    });
+  }
+
+  // 5b. RULE: Underspend surplus is ready to move to goals.
+  if (da.underspendPool >= 500 && savingsGoals.some((g) => g.currentBalance < (g.targetAmount || 0))) {
+    insights.push({
+      id: 'ins-sweep-underspend',
+      type: 'recommendation',
+      title: 'You Underspent — Move It to Your Goals',
+      message: `You're ${formatCurrency(da.underspendPool)} under your day-to-day pace so far this month. Sweep it into your savings goals now so the surplus doesn't quietly leak back into spending.`,
+      metric: `${formatCurrency(da.underspendPool)} to sweep`,
+      actionText: 'Sweep to Goals',
+      actionType: 'sweep_to_goals',
     });
   }
 
@@ -460,10 +432,13 @@ export function generateWeeklyDigest(
     });
   }
 
-  const plannedTotal = buckets.filter((b) => !b.isArchived).reduce((s, b) => s + b.plannedMonthly, 0);
-  if (totalIncome > plannedTotal) {
+  const da = calculateDailyAllowance(buckets, transactions, incomeProfile, monthStr, currentDate);
+  recommendations.push(
+    `Day-to-day budget: ${formatCurrency(da.safeDailyAllowance)}/day (${formatCurrency(da.remainingSpendable)} left for ${da.remainingDays} days) after reserving ${formatCurrency(da.savingsReserve)} for goals.`
+  );
+  if (da.underspendPool >= 500) {
     recommendations.push(
-      `You have ${formatCurrency(totalIncome - plannedTotal)} unallocated income. Transfer this surplus into Hostel Fund or Gadget Fund.`
+      `You're ${formatCurrency(da.underspendPool)} under your spending pace — move it into your savings goals.`
     );
   }
 

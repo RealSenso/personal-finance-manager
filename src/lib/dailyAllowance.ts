@@ -1,30 +1,35 @@
-import { Bucket, Transaction } from '../types';
+import { Bucket, Transaction, UserIncomeProfile } from '../types';
 import { getDaysInMonth } from './insights';
 
 export interface DailyExpenseAllowance {
   currentDay: number;
   totalDaysInMonth: number;
-  remainingDays: number; // Includes today
-  
-  // Total Recurring Envelopes
-  totalRecurringBudget: number;
-  totalSpentThisMonth: number;
-  remainingBudget: number;
-  safeDailyAllowance: number; // Safe spend per day for remaining days
+  daysElapsed: number;
+  remainingDays: number; // includes today
 
-  // Today's Activity
+  // Monthly cash model
+  totalIncome: number;
+  savingsRatePercent: number;
+  savingsReserve: number;      // income locked for goals before any day-to-day budget
+  fixedCommitments: number;    // fixed bills (subscriptions, rent, recharge) for the month
+  monthlySpendable: number;    // what's actually free to spend day-to-day this month
+  baselineDaily: number;       // steady-state target = monthlySpendable / days in month
+
+  // Discretionary spend so far
+  flexSpent: number;           // month-to-date expenses in non-fixed buckets
+  remainingSpendable: number;  // monthlySpendable - flexSpent
+  safeDailyAllowance: number;  // remainingSpendable / remainingDays (adapts to your pace)
+
   todayDateStr: string;
   todaySpent: number;
-  todayRemaining: number; // safeDailyAllowance - todaySpent
+  todayRemaining: number;
   todayStatus: 'under_budget' | 'at_limit' | 'exceeded';
 
-  // Discretionary / Flexible (Fun Fund + Buffer + Daily miscellaneous)
-  flexibleBudget: number;
-  flexibleSpent: number;
-  flexibleRemaining: number;
-  flexibleDailyAllowance: number;
+  // The "human" bit: money you saved by underspending, ready to move to goals
+  underspendPool: number;
+  paceStatus: 'ahead' | 'on_track' | 'behind';
 
-  // Breakdown by recurring bucket
+  // Per non-fixed envelope
   bucketAllowances: {
     bucketId: string;
     bucketName: string;
@@ -34,94 +39,93 @@ export interface DailyExpenseAllowance {
     remaining: number;
     dailyAllowance: number;
   }[];
-
-  // Burn rate comparison
-  avgDailySpentSoFar: number;
-  burnPacing: 'thrifty' | 'on_track' | 'accelerated';
 }
 
 export function calculateDailyAllowance(
   buckets: Bucket[],
   transactions: Transaction[],
+  incomeProfile: UserIncomeProfile,
   currentMonth: string, // YYYY-MM
-  simulatedDate: Date = new Date(2026, 8, 3) // Default to app date Sep 3, 2026
+  now: Date = new Date()
 ): DailyExpenseAllowance {
   const [year, month] = currentMonth.split('-').map(Number);
   const totalDaysInMonth = getDaysInMonth(year, month - 1);
 
-  // Check if simulated date matches the selected month
-  const isSelectedMonth =
-    simulatedDate.getFullYear() === year && simulatedDate.getMonth() === month - 1;
+  const isSelectedMonth = now.getFullYear() === year && now.getMonth() === month - 1;
+  const isPastMonth =
+    year < now.getFullYear() ||
+    (year === now.getFullYear() && month - 1 < now.getMonth());
 
   const currentDay = isSelectedMonth
-    ? Math.min(simulatedDate.getDate(), totalDaysInMonth)
-    : totalDaysInMonth; // If viewing past month, treat as end of month
+    ? Math.min(now.getDate(), totalDaysInMonth)
+    : isPastMonth
+      ? totalDaysInMonth
+      : 1; // future month not started yet
 
+  const daysElapsed = Math.max(1, currentDay);
   const remainingDays = Math.max(1, totalDaysInMonth - currentDay + 1);
 
-  // Today date string YYYY-MM-DD
   const todayDateStr = isSelectedMonth
     ? `${year}-${String(month).padStart(2, '0')}-${String(currentDay).padStart(2, '0')}`
     : `${year}-${String(month).padStart(2, '0')}-01`;
 
-  // Filter recurring buckets
-  const recurringBuckets = buckets.filter((b) => b.type === 'recurring' && !b.isArchived);
-  const totalRecurringBudget = recurringBuckets.reduce((sum, b) => sum + b.plannedMonthly, 0);
+  // --- Income & the amount reserved for goals ---
+  const totalIncome =
+    incomeProfile.stipend +
+    incomeProfile.extra +
+    (incomeProfile.otherStreams || []).reduce((s, st) => s + st.amount, 0);
 
-  // Month-to-date expenses
+  const savingsRatePercent = Math.min(90, Math.max(0, incomeProfile.savingsRatePercent ?? 25));
+  const savingsReserve = Math.round((totalIncome * savingsRatePercent) / 100);
+
+  // --- Fixed bills vs flexible envelopes ---
+  const recurring = buckets.filter((b) => b.type === 'recurring' && !b.isArchived);
+  const fixedIds = new Set(recurring.filter((b) => b.isFixed).map((b) => b.id));
+  const flexBuckets = recurring.filter((b) => !b.isFixed);
+
   const monthExpenses = transactions.filter(
     (tx) => tx.type === 'expense' && tx.date.startsWith(currentMonth)
   );
-  const totalSpentThisMonth = monthExpenses.reduce((sum, tx) => sum + tx.amount, 0);
-  const remainingBudget = Math.max(0, totalRecurringBudget - totalSpentThisMonth);
 
-  // Safe daily allowance
-  const safeDailyAllowance = Math.round(remainingBudget / remainingDays);
+  const fixedPlanned = recurring
+    .filter((b) => b.isFixed)
+    .reduce((s, b) => s + b.plannedMonthly, 0);
+  const fixedSpent = monthExpenses
+    .filter((tx) => fixedIds.has(tx.bucketId))
+    .reduce((s, tx) => s + tx.amount, 0);
+  const fixedCommitments = Math.max(fixedPlanned, fixedSpent);
 
-  // Today's specific expenses
-  const todayExpenses = monthExpenses.filter((tx) => tx.date === todayDateStr);
-  const todaySpent = todayExpenses.reduce((sum, tx) => sum + tx.amount, 0);
+  // Every expense that isn't a fixed bill counts as day-to-day / discretionary.
+  const flexExpenses = monthExpenses.filter((tx) => !fixedIds.has(tx.bucketId));
+  const flexSpent = flexExpenses.reduce((s, tx) => s + tx.amount, 0);
+
+  // --- The budget ---
+  const monthlySpendable = Math.max(0, totalIncome - savingsReserve - fixedCommitments);
+  const baselineDaily = Math.round(monthlySpendable / totalDaysInMonth);
+  const remainingSpendable = Math.max(0, monthlySpendable - flexSpent);
+  const safeDailyAllowance = Math.round(remainingSpendable / remainingDays);
+
+  const todaySpent = flexExpenses
+    .filter((tx) => tx.date === todayDateStr)
+    .reduce((s, tx) => s + tx.amount, 0);
   const todayRemaining = safeDailyAllowance - todaySpent;
 
-  let todayStatus: 'under_budget' | 'at_limit' | 'exceeded' = 'under_budget';
-  if (todaySpent > safeDailyAllowance) {
-    todayStatus = 'exceeded';
-  } else if (todaySpent === safeDailyAllowance || todayRemaining <= 50) {
-    todayStatus = 'at_limit';
-  }
+  let todayStatus: DailyExpenseAllowance['todayStatus'] = 'under_budget';
+  if (todaySpent > safeDailyAllowance) todayStatus = 'exceeded';
+  else if (todayRemaining <= 50) todayStatus = 'at_limit';
 
-  // Flexible / Discretionary buckets (e.g. Fun Fund, Buffer, Food, Entertainment)
-  const flexibleBuckets = recurringBuckets.filter((b) => {
-    const lowerName = b.name.toLowerCase();
-    const lowerCat = (b.category || '').toLowerCase();
-    return (
-      lowerName.includes('fun') ||
-      lowerName.includes('buffer') ||
-      lowerName.includes('misc') ||
-      lowerCat.includes('leisure') ||
-      lowerCat.includes('flexible') ||
-      lowerCat.includes('general')
-    );
-  });
+  // --- Underspend pool: how far ahead of the steady pace you are right now ---
+  const expectedByNow = baselineDaily * daysElapsed;
+  const underspendPool = Math.max(0, Math.round(expectedByNow - flexSpent));
+  let paceStatus: DailyExpenseAllowance['paceStatus'] = 'on_track';
+  if (flexSpent > expectedByNow * 1.1) paceStatus = 'behind';
+  else if (flexSpent < expectedByNow * 0.9) paceStatus = 'ahead';
 
-  const targetFlexibles = flexibleBuckets.length > 0 ? flexibleBuckets : recurringBuckets;
-  const flexibleBudget = targetFlexibles.reduce((sum, b) => sum + b.plannedMonthly, 0);
-  const flexibleSpent = targetFlexibles.reduce((sum, b) => {
-    const bSpent = monthExpenses
-      .filter((tx) => tx.bucketId === b.id)
-      .reduce((s, tx) => s + tx.amount, 0);
-    return sum + bSpent;
-  }, 0);
-  const flexibleRemaining = Math.max(0, flexibleBudget - flexibleSpent);
-  const flexibleDailyAllowance = Math.round(flexibleRemaining / remainingDays);
-
-  // Per-envelope daily allowance
-  const bucketAllowances = recurringBuckets.map((bucket) => {
-    const spent = monthExpenses
+  const bucketAllowances = flexBuckets.map((bucket) => {
+    const spent = flexExpenses
       .filter((tx) => tx.bucketId === bucket.id)
       .reduce((s, tx) => s + tx.amount, 0);
     const remaining = Math.max(0, bucket.plannedMonthly - spent);
-    const dailyAllowance = Math.round(remaining / remainingDays);
     return {
       bucketId: bucket.id,
       bucketName: bucket.name,
@@ -129,59 +133,45 @@ export function calculateDailyAllowance(
       planned: bucket.plannedMonthly,
       spent,
       remaining,
-      dailyAllowance,
+      dailyAllowance: Math.round(remaining / remainingDays),
     };
   });
-
-  // Average daily spent so far
-  const daysElapsed = Math.max(1, currentDay);
-  const avgDailySpentSoFar = Math.round(totalSpentThisMonth / daysElapsed);
-
-  let burnPacing: 'thrifty' | 'on_track' | 'accelerated' = 'on_track';
-  if (avgDailySpentSoFar < safeDailyAllowance * 0.85) {
-    burnPacing = 'thrifty';
-  } else if (avgDailySpentSoFar > safeDailyAllowance * 1.15) {
-    burnPacing = 'accelerated';
-  }
 
   return {
     currentDay,
     totalDaysInMonth,
+    daysElapsed,
     remainingDays,
-    totalRecurringBudget,
-    totalSpentThisMonth,
-    remainingBudget,
+    totalIncome,
+    savingsRatePercent,
+    savingsReserve,
+    fixedCommitments,
+    monthlySpendable,
+    baselineDaily,
+    flexSpent,
+    remainingSpendable,
     safeDailyAllowance,
     todayDateStr,
     todaySpent,
     todayRemaining,
     todayStatus,
-    flexibleBudget,
-    flexibleSpent,
-    flexibleRemaining,
-    flexibleDailyAllowance,
+    underspendPool,
+    paceStatus,
     bucketAllowances,
-    avgDailySpentSoFar,
-    burnPacing,
   };
 }
 
-// What-if simulator: If I spend X today, what will tomorrow's daily allowance be?
+// What-if: if I spend X more today, what does tomorrow's safe allowance become?
 export function simulateTomorrowAllowance(
-  currentRemainingBudget: number,
+  remainingSpendable: number,
   remainingDaysIncludingToday: number,
   hypotheticalSpendToday: number
-): {
-  newAllowanceTomorrow: number;
-  difference: number;
-} {
-  const currentDaily = Math.round(currentRemainingBudget / Math.max(1, remainingDaysIncludingToday));
+): { newAllowanceTomorrow: number; difference: number } {
+  const currentDaily = Math.round(
+    remainingSpendable / Math.max(1, remainingDaysIncludingToday)
+  );
   const daysTomorrow = Math.max(1, remainingDaysIncludingToday - 1);
-  const remainingAfterSpend = Math.max(0, currentRemainingBudget - hypotheticalSpendToday);
+  const remainingAfterSpend = Math.max(0, remainingSpendable - hypotheticalSpendToday);
   const newAllowanceTomorrow = Math.round(remainingAfterSpend / daysTomorrow);
-  
-  return {
-    newAllowanceTomorrow,
-    difference: newAllowanceTomorrow - currentDaily,
-  };
+  return { newAllowanceTomorrow, difference: newAllowanceTomorrow - currentDaily };
 }

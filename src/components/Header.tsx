@@ -24,6 +24,7 @@ interface HeaderProps {
   onOpenRules: () => void;
   onOpenStorageManager: () => void;
   onOpenExport: () => void;
+  syncButton?: React.ReactNode;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -37,8 +38,10 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenRules,
   onOpenStorageManager,
   onOpenExport,
+  syncButton,
 }) => {
-  const allowedEmail = import.meta.env.VITE_ALLOWED_USER_EMAIL || 'official.senso.vt@gmail.com';
+  const now = new Date();
+  const thisMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
 
   const formatMonthDisplay = (m: string) => {
     const [year, month] = m.split('-').map(Number);
@@ -67,7 +70,7 @@ export const Header: React.FC<HeaderProps> = ({
               <div className="flex items-center gap-2 text-xs text-zinc-400 mt-0.5">
                 <span className="flex items-center gap-1 font-mono text-zinc-400">
                   <Lock className="w-3 h-3 text-zinc-400" />
-                  {allowedEmail}
+                  Envelope budgeting
                 </span>
                 <span>•</span>
                 <button
@@ -97,7 +100,7 @@ export const Header: React.FC<HeaderProps> = ({
             >
               {availableMonths.map((m) => (
                 <option key={m} value={m} className="bg-zinc-900 text-zinc-200">
-                  {formatMonthDisplay(m)} {m === '2026-09' ? '(Current)' : ''}
+                  {formatMonthDisplay(m)} {m === thisMonth ? '(Current)' : ''}
                 </option>
               ))}
             </select>
@@ -163,6 +166,8 @@ export const Header: React.FC<HeaderProps> = ({
             <HardDrive className="w-3.5 h-3.5 text-emerald-400" />
             <span>Storage & Sync</span>
           </button>
+
+          {syncButton}
 
           {/* Primary Action */}
           <button
