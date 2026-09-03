@@ -1,16 +1,5 @@
 import React, { useState } from "react";
-import {
-  Receipt,
-  Search,
-  Trash2,
-  FileSpreadsheet,
-  User,
-  ArrowDownLeft,
-  ArrowUpRight,
-  Filter,
-  Calendar,
-  HandCoins,
-} from "lucide-react";
+import { Receipt, Search, Trash2, HandCoins } from "lucide-react";
 import { Bucket, Transaction } from "../types";
 import { formatCurrency } from "../lib/insights";
 
@@ -27,226 +16,160 @@ export const TransactionList: React.FC<TransactionListProps> = ({
   currentMonth,
   onDeleteTransaction,
 }) => {
-  const [searchTerm, setSearchTerm] = useState("");
-  const [selectedBucketFilter, setSelectedBucketFilter] =
-    useState<string>("all");
-  const [selectedTypeFilter, setSelectedTypeFilter] = useState<string>("all");
-  const [showCurrentMonthOnly, setShowCurrentMonthOnly] =
-    useState<boolean>(true);
+  const [query, setQuery] = useState("");
+  const [bucketFilter, setBucketFilter] = useState("all");
+  const [monthOnly, setMonthOnly] = useState(true);
 
-  const bucketMap = new Map<string, Bucket>(buckets.map((b) => [b.id, b]));
+  const byId = new Map(buckets.map((b) => [b.id, b]));
 
-  const filtered = transactions.filter((t) => {
-    if (showCurrentMonthOnly && !t.date.startsWith(currentMonth)) {
-      return false;
-    }
-    if (selectedBucketFilter !== "all" && t.bucketId !== selectedBucketFilter) {
-      return false;
-    }
-    if (selectedTypeFilter !== "all" && t.type !== selectedTypeFilter) {
-      return false;
-    }
-    if (searchTerm) {
-      const q = searchTerm.toLowerCase();
-      const matchNote = (t.note || "").toLowerCase().includes(q);
-      const matchMerchant = (t.merchant || "").toLowerCase().includes(q);
-      const bucketName = bucketMap.get(t.bucketId)?.name.toLowerCase() || "";
-      if (!matchNote && !matchMerchant && !bucketName.includes(q)) {
-        return false;
+  const rows = transactions
+    .filter((t) => {
+      if (monthOnly && !t.date.startsWith(currentMonth)) return false;
+      if (bucketFilter !== "all" && t.bucketId !== bucketFilter) return false;
+      if (query) {
+        const q = query.toLowerCase();
+        const name = byId.get(t.bucketId)?.name.toLowerCase() || "";
+        if (
+          !(t.note || "").toLowerCase().includes(q) &&
+          !(t.merchant || "").toLowerCase().includes(q) &&
+          !name.includes(q)
+        )
+          return false;
       }
-    }
-    return true;
-  });
+      return true;
+    })
+    .sort((a, b) => b.date.localeCompare(a.date));
 
-  // Sort descending by date
-  const sorted = [...filtered].sort((a, b) => b.date.localeCompare(a.date));
+  const field =
+    "bg-zinc-950 border border-zinc-800 rounded-lg text-xs text-zinc-300 focus:outline-none focus:border-emerald-500";
 
   return (
-    <div className="m-panel bg-zinc-900/40 border border-zinc-800 rounded-2xl p-3.5 space-y-3">
-      {/* Table Header & Controls */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-        <div className="flex items-center gap-2">
-          <Receipt className="w-3.5 h-3.5 text-emerald-400" />
-          <span className="m-label text-emerald-300">
-            Ledger ({sorted.length})
+    <div className="m-panel p-3.5 flex flex-col lg:flex-1 lg:min-h-0">
+      {/* Header + filters */}
+      <div className="shrink-0 space-y-2.5">
+        <div className="flex items-center justify-between gap-2">
+          <span className="m-label text-emerald-300 flex items-center gap-1.5">
+            <Receipt className="w-3.5 h-3.5" />
+            Ledger ({rows.length})
           </span>
+          <button
+            onClick={() => setMonthOnly((v) => !v)}
+            className={`px-2.5 py-1 rounded-full text-[11px] font-medium border transition-colors cursor-pointer ${
+              monthOnly
+                ? "bg-zinc-800 border-zinc-700 text-zinc-200"
+                : "bg-zinc-950 border-zinc-800 text-zinc-400 hover:text-zinc-200"
+            }`}
+          >
+            {monthOnly ? "This month" : "All time"}
+          </button>
         </div>
-
-        {/* Filter Toolbar */}
-        <div className="flex flex-wrap items-center gap-2">
-          {/* Search input */}
-          <div className="relative">
+        <div className="flex items-center gap-2">
+          <div className="relative flex-1">
             <Search className="w-3.5 h-3.5 text-zinc-500 absolute left-2.5 top-1/2 -translate-y-1/2" />
             <input
               type="text"
-              placeholder="Search transactions..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="bg-zinc-950 border border-zinc-800 rounded-lg pl-8 pr-3 py-1.5 text-xs text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-emerald-500 w-48 font-sans"
+              placeholder="Search…"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              className={`${field} w-full pl-8 pr-3 py-1.5`}
             />
           </div>
-
-          {/* Bucket Filter */}
           <select
-            value={selectedBucketFilter}
-            onChange={(e) => setSelectedBucketFilter(e.target.value)}
-            aria-label="Filter by Bucket"
-            className="bg-zinc-950 border border-zinc-800 rounded-lg px-2.5 py-1.5 text-xs text-zinc-300 focus:outline-none focus:border-emerald-500 cursor-pointer"
+            value={bucketFilter}
+            onChange={(e) => setBucketFilter(e.target.value)}
+            aria-label="Filter by envelope"
+            className={`${field} px-2.5 py-1.5 cursor-pointer max-w-[8rem]`}
           >
-            <option value="all">All Buckets</option>
+            <option value="all">All</option>
             {buckets.map((b) => (
               <option key={b.id} value={b.id}>
                 {b.name}
               </option>
             ))}
           </select>
-
-          {/* Month Scope Toggle */}
-          <button
-            onClick={() => setShowCurrentMonthOnly(!showCurrentMonthOnly)}
-            className={`px-2.5 py-1.5 rounded-lg text-xs font-medium border transition-colors cursor-pointer ${
-              showCurrentMonthOnly
-                ? "bg-zinc-800 border-zinc-700 text-zinc-200"
-                : "bg-zinc-950 border-zinc-800 text-zinc-400 hover:text-zinc-200"
-            }`}
-          >
-            {showCurrentMonthOnly ? "Current Month" : "All Time"}
-          </button>
         </div>
       </div>
 
-      {/* Transactions Data Table */}
-      <div className="overflow-x-auto border border-zinc-800 rounded-lg">
-        <table className="w-full text-left text-xs">
-          <thead className="bg-zinc-950/80 text-zinc-400 font-mono text-[11px] border-b border-zinc-800">
-            <tr>
-              <th className="py-2.5 px-3">Date</th>
-              <th className="py-2.5 px-3">Description / Merchant</th>
-              <th className="py-2.5 px-3">Bucket Envelope</th>
-              <th className="py-2.5 px-3">Source</th>
-              <th className="py-2.5 px-3 text-right">Amount</th>
-              <th className="py-2.5 px-3 text-right">Action</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-zinc-800/60 font-sans">
-            {sorted.length === 0 ? (
-              <tr>
-                <td
-                  colSpan={6}
-                  className="py-8 text-center text-zinc-500 text-xs"
-                >
-                  No transactions found matching the selected filters.
-                </td>
-              </tr>
-            ) : (
-              sorted.map((tx) => {
-                const bucket = bucketMap.get(tx.bucketId);
-                const isExpense = tx.type === "expense";
-                return (
-                  <tr
-                    key={tx.id}
-                    className="hover:bg-zinc-800/40 transition-colors"
-                  >
-                    <td className="py-2.5 px-3 font-mono text-zinc-400 whitespace-nowrap">
-                      {tx.date}
-                    </td>
-                    <td className="py-2.5 px-3 font-medium text-zinc-200">
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        <span>
-                          {tx.note || tx.merchant || "Untitled Transaction"}
-                        </span>
-                        {tx.paidBy === "other" && (
-                          <span
-                            className={`inline-flex items-center gap-1 text-[10px] font-mono px-1.5 py-0.5 rounded border ${
-                              tx.settled
-                                ? "bg-zinc-800 text-zinc-400 border-zinc-700/60"
-                                : "bg-amber-500/10 text-amber-400 border-amber-500/25"
-                            }`}
-                            title={
-                              tx.settled
-                                ? `Repaid to ${tx.counterparty || "someone"}`
-                                : `You owe ${tx.counterparty || "someone"}`
-                            }
-                          >
-                            <HandCoins className="w-2.5 h-2.5" />
-                            {tx.settled
-                              ? "Repaid"
-                              : `Owe ${tx.counterparty || ""}`.trim()}
-                          </span>
-                        )}
-                      </div>
-                      {tx.merchant && tx.note && tx.merchant !== tx.note && (
-                        <div className="text-[11px] text-zinc-500 font-normal">
-                          {tx.merchant}
-                        </div>
-                      )}
-                    </td>
-                    <td className="py-2.5 px-3 whitespace-nowrap">
-                      {bucket ? (
-                        <span
-                          className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[11px] font-medium"
-                          style={{
-                            backgroundColor: `${bucket.color}18`,
-                            color: bucket.color,
-                            border: `1px solid ${bucket.color}35`,
-                          }}
-                        >
-                          <span
-                            className="w-1.5 h-1.5 rounded-full"
-                            style={{ backgroundColor: bucket.color }}
-                          />
-                          {bucket.name}
-                        </span>
-                      ) : (
-                        <span className="text-zinc-500 italic">
-                          Uncategorized
-                        </span>
-                      )}
-                    </td>
-                    <td className="py-2.5 px-3 whitespace-nowrap">
-                      {tx.source === "csv_import" ? (
-                        <span className="inline-flex items-center gap-1 text-[10px] font-mono px-1.5 py-0.5 rounded bg-zinc-800 text-amber-400 border border-zinc-700/60">
-                          <FileSpreadsheet className="w-2.5 h-2.5" />
-                          CSV
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1 text-[10px] font-mono px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-400 border border-zinc-700/60">
-                          <User className="w-2.5 h-2.5" />
-                          Manual
-                        </span>
-                      )}
-                    </td>
-                    <td className="py-2.5 px-3 text-right font-mono font-semibold whitespace-nowrap">
-                      {isExpense ? (
-                        <span className="text-zinc-100">
-                          -{formatCurrency(tx.amount)}
-                        </span>
-                      ) : (
-                        <span className="text-emerald-400">
-                          +{formatCurrency(tx.amount)}
-                        </span>
-                      )}
-                    </td>
-                    <td className="py-2.5 px-3 text-right whitespace-nowrap">
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onDeleteTransaction(tx.id);
-                        }}
-                        className="text-zinc-500 hover:text-rose-400 p-1.5 rounded-lg hover:bg-rose-500/10 transition-colors cursor-pointer inline-flex items-center justify-center"
-                        title="Delete transaction"
+      {/* Rows — vertical scroll only, no horizontal scroll */}
+      <ul className="mt-3 lg:flex-1 lg:min-h-0 lg:m-scroll divide-y divide-zinc-800/70 lg:pr-1">
+        {rows.length === 0 ? (
+          <li className="py-10 text-center text-zinc-500 text-xs">
+            Nothing here yet.
+          </li>
+        ) : (
+          rows.map((tx) => {
+            const bucket = byId.get(tx.bucketId);
+            const expense = tx.type === "expense";
+            return (
+              <li
+                key={tx.id}
+                className="group flex items-center gap-3 py-2.5 hover:bg-zinc-800/30 -mx-1.5 px-1.5 rounded-lg transition-colors"
+              >
+                <span className="font-mono text-[11px] text-zinc-500 w-12 shrink-0">
+                  {tx.date.slice(5)}
+                </span>
+
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className="text-xs text-zinc-200 truncate">
+                      {tx.note || tx.merchant || "Untitled"}
+                    </span>
+                    {tx.paidBy === "other" && (
+                      <span
+                        className={`inline-flex items-center gap-1 text-[10px] font-mono px-1.5 py-0.5 rounded border ${
+                          tx.settled
+                            ? "bg-zinc-800 text-zinc-400 border-zinc-700/60"
+                            : "bg-amber-500/10 text-amber-400 border-amber-500/25"
+                        }`}
+                        title={
+                          tx.settled
+                            ? `Repaid to ${tx.counterparty || "someone"}`
+                            : `You owe ${tx.counterparty || "someone"}`
+                        }
                       >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </td>
-                  </tr>
-                );
-              })
-            )}
-          </tbody>
-        </table>
-      </div>
+                        <HandCoins className="w-2.5 h-2.5" />
+                        {tx.settled
+                          ? "Repaid"
+                          : `Owe ${tx.counterparty || ""}`.trim()}
+                      </span>
+                    )}
+                  </div>
+                  {bucket && (
+                    <span
+                      className="inline-flex items-center gap-1 text-[10px] mt-0.5"
+                      style={{ color: bucket.color }}
+                    >
+                      <span
+                        className="w-1.5 h-1.5 rounded-full"
+                        style={{ backgroundColor: bucket.color }}
+                      />
+                      {bucket.name}
+                    </span>
+                  )}
+                </div>
+
+                <span
+                  className={`font-mono text-xs font-semibold shrink-0 tabular-nums ${
+                    expense ? "text-zinc-200" : "text-emerald-300"
+                  }`}
+                >
+                  {expense ? "−" : "+"}
+                  {formatCurrency(tx.amount)}
+                </span>
+
+                <button
+                  type="button"
+                  onClick={() => onDeleteTransaction(tx.id)}
+                  className="shrink-0 text-zinc-400 hover:text-rose-400 p-1 rounded opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity cursor-pointer"
+                  title="Delete"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              </li>
+            );
+          })
+        )}
+      </ul>
     </div>
   );
 };

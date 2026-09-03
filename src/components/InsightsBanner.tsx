@@ -1,14 +1,14 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   AlertTriangle,
-  Info,
   CheckCircle,
-  Sparkles,
   ArrowRight,
   X,
   Flame,
   Clock,
   ArrowRightLeft,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { RuleInsight } from "../types";
 
@@ -17,109 +17,113 @@ interface InsightsBannerProps {
   onActionClick?: (insight: RuleInsight) => void;
 }
 
+const icon = (t: RuleInsight["type"]) => {
+  switch (t) {
+    case "alert":
+      return <AlertTriangle className="w-4 h-4 text-rose-400" />;
+    case "warning":
+      return <Flame className="w-4 h-4 text-amber-400" />;
+    case "recommendation":
+      return <ArrowRightLeft className="w-4 h-4 text-purple-400" />;
+    case "success":
+      return <CheckCircle className="w-4 h-4 text-emerald-400" />;
+    default:
+      return <Clock className="w-4 h-4 text-cyan-400" />;
+  }
+};
+
+const tint = (t: RuleInsight["type"]) => {
+  switch (t) {
+    case "alert":
+      return "border-rose-500/30 bg-rose-950/20";
+    case "warning":
+      return "border-amber-500/30 bg-amber-950/20";
+    case "recommendation":
+      return "border-purple-500/30 bg-purple-950/20";
+    case "success":
+      return "border-emerald-500/30 bg-emerald-950/20";
+    default:
+      return "border-cyan-500/30 bg-cyan-950/20";
+  }
+};
+
 export const InsightsBanner: React.FC<InsightsBannerProps> = ({
   insights,
   onActionClick,
 }) => {
-  const [dismissedIds, setDismissedIds] = useState<Set<string>>(new Set());
+  const [dismissed, setDismissed] = useState<Set<string>>(new Set());
+  const [i, setI] = useState(0);
 
-  const activeInsights = insights.filter((i) => !dismissedIds.has(i.id));
+  const active = insights.filter((x) => !dismissed.has(x.id));
 
-  if (activeInsights.length === 0) {
-    return null;
-  }
+  // keep the pointer in range as the list changes
+  useEffect(() => {
+    if (i > active.length - 1) setI(Math.max(0, active.length - 1));
+  }, [active.length, i]);
 
-  const handleDismiss = (id: string) => {
-    setDismissedIds((prev) => new Set([...prev, id]));
-  };
+  if (active.length === 0) return null;
 
-  const getIcon = (type: RuleInsight["type"]) => {
-    switch (type) {
-      case "alert":
-        return <AlertTriangle className="w-4 h-4 text-rose-400" />;
-      case "warning":
-        return <Flame className="w-4 h-4 text-amber-400" />;
-      case "recommendation":
-        return <ArrowRightLeft className="w-4 h-4 text-purple-400" />;
-      case "success":
-        return <CheckCircle className="w-4 h-4 text-emerald-400" />;
-      case "info":
-      default:
-        return <Clock className="w-4 h-4 text-cyan-400" />;
-    }
-  };
-
-  const getBorderColor = (type: RuleInsight["type"]) => {
-    switch (type) {
-      case "alert":
-        return "border-rose-500/30 bg-rose-950/20";
-      case "warning":
-        return "border-amber-500/30 bg-amber-950/20";
-      case "recommendation":
-        return "border-purple-500/30 bg-purple-950/20";
-      case "success":
-        return "border-emerald-500/30 bg-emerald-950/20";
-      case "info":
-      default:
-        return "border-cyan-500/30 bg-cyan-950/20";
-    }
-  };
+  const item = active[Math.min(i, active.length - 1)];
+  const go = (d: number) =>
+    setI((p) => (p + d + active.length) % active.length);
+  const drop = (id: string) => setDismissed((p) => new Set([...p, id]));
 
   return (
-    <div className="m-panel bg-zinc-900/40 border border-zinc-800 rounded-2xl p-3 space-y-2.5">
-      <div className="flex items-center gap-2">
-        <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-        <span className="m-label text-emerald-400">
-          Notes ({activeInsights.length})
-        </span>
+    <div className="m-panel p-3 shrink-0">
+      <div className="flex items-center justify-between">
+        <span className="m-label text-emerald-300">Notes</span>
+        <div className="flex items-center gap-1.5">
+          <span className="text-[11px] font-mono text-zinc-400">
+            {Math.min(i, active.length - 1) + 1} / {active.length}
+          </span>
+          <button
+            onClick={() => go(-1)}
+            disabled={active.length < 2}
+            className="p-1 rounded text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 disabled:opacity-30 disabled:hover:bg-transparent transition-colors cursor-pointer"
+            title="Previous"
+          >
+            <ChevronLeft className="w-4 h-4" />
+          </button>
+          <button
+            onClick={() => go(1)}
+            disabled={active.length < 2}
+            className="p-1 rounded text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 disabled:opacity-30 disabled:hover:bg-transparent transition-colors cursor-pointer"
+            title="Next"
+          >
+            <ChevronRight className="w-4 h-4" />
+          </button>
+          <button
+            onClick={() => drop(item.id)}
+            className="p-1 rounded text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 transition-colors cursor-pointer"
+            title="Dismiss"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-2.5">
-        {activeInsights.slice(0, 6).map((item) => (
-          <div
-            key={item.id}
-            className={`border rounded-xl p-3.5 flex items-start justify-between gap-3 transition-colors ${getBorderColor(
-              item.type,
-            )}`}
+      <div className={`mt-2.5 border rounded-xl p-3.5 ${tint(item.type)}`}>
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="shrink-0">{icon(item.type)}</span>
+          <h4 className="text-xs font-bold text-zinc-100">{item.title}</h4>
+          {item.metric && (
+            <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-zinc-900/70 border border-zinc-800 text-zinc-300">
+              {item.metric}
+            </span>
+          )}
+        </div>
+        <p className="text-xs text-zinc-300 mt-1.5 leading-relaxed">
+          {item.message}
+        </p>
+        {item.actionText && onActionClick && (
+          <button
+            onClick={() => onActionClick(item)}
+            className="mt-2 text-xs font-semibold text-emerald-300 hover:text-emerald-400 inline-flex items-center gap-1 cursor-pointer transition-colors"
           >
-            <div className="flex items-start gap-2.5 flex-1 min-w-0">
-              <div className="mt-0.5 shrink-0">{getIcon(item.type)}</div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <h4 className="text-xs font-bold text-zinc-100 tracking-tight">
-                    {item.title}
-                  </h4>
-                  {item.metric && (
-                    <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-zinc-900/80 border border-zinc-800 text-zinc-300">
-                      {item.metric}
-                    </span>
-                  )}
-                </div>
-                <p className="text-xs text-zinc-300 mt-1 leading-relaxed">
-                  {item.message}
-                </p>
-
-                {item.actionText && onActionClick && (
-                  <button
-                    onClick={() => onActionClick(item)}
-                    className="mt-2 text-xs font-semibold text-emerald-400 hover:text-emerald-300 inline-flex items-center gap-1 cursor-pointer transition-colors"
-                  >
-                    <span>{item.actionText}</span>
-                    <ArrowRight className="w-3 h-3" />
-                  </button>
-                )}
-              </div>
-            </div>
-
-            <button
-              onClick={() => handleDismiss(item.id)}
-              className="text-zinc-500 hover:text-zinc-300 p-0.5 rounded transition-colors cursor-pointer shrink-0"
-              title="Dismiss insight"
-            >
-              <X className="w-3.5 h-3.5" />
-            </button>
-          </div>
-        ))}
+            {item.actionText}
+            <ArrowRight className="w-3 h-3" />
+          </button>
+        )}
       </div>
     </div>
   );

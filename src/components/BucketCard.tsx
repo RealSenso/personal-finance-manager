@@ -64,13 +64,13 @@ export const BucketCard: React.FC<BucketCardProps> = ({
       spent > 0;
 
     return (
-      <div className="m-panel bg-zinc-900/80 border border-zinc-800 rounded-xl p-3.5 flex flex-col justify-between hover:border-emerald-500/40 transition-all group relative">
+      <div className="m-panel bg-zinc-900/80 border border-zinc-800 rounded-xl p-3.5 h-[206px] overflow-hidden flex flex-col justify-between hover:border-emerald-500/40 transition-all group relative">
         <div>
           {/* Header row */}
-          <div className="flex items-start justify-between">
-            <div className="flex items-center gap-2.5">
+          <div className="flex items-start justify-between gap-2">
+            <div className="flex items-center gap-2.5 min-w-0 flex-1">
               <div
-                className="w-8 h-8 rounded-lg flex items-center justify-center text-sm font-semibold shadow-inner"
+                className="w-8 h-8 shrink-0 rounded-lg flex items-center justify-center text-sm font-semibold shadow-inner"
                 style={{
                   backgroundColor: `${bucket.color}20`,
                   color: bucket.color,
@@ -79,18 +79,18 @@ export const BucketCard: React.FC<BucketCardProps> = ({
               >
                 <Wallet className="w-4 h-4" />
               </div>
-              <div>
-                <h3 className="text-sm font-bold text-zinc-100 tracking-tight">
+              <div className="min-w-0">
+                <h3 className="text-sm font-bold text-zinc-100 tracking-tight truncate">
                   {bucket.name}
                 </h3>
-                <span className="text-[11px] text-zinc-400 font-mono">
+                <span className="text-[11px] text-zinc-400 font-mono block truncate">
                   {bucket.category || "Recurring"}
                 </span>
               </div>
             </div>
 
             {/* Pacing Chip */}
-            <div className="flex items-center gap-1.5">
+            <div className="flex items-center gap-1.5 shrink-0">
               {isExceeded ? (
                 <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-rose-500/10 border border-rose-500/30 text-rose-400 font-semibold">
                   Exceeded
@@ -216,13 +216,13 @@ export const BucketCard: React.FC<BucketCardProps> = ({
   const isGoalReached = current >= target && target > 0;
 
   return (
-    <div className="m-panel bg-zinc-900/80 border border-zinc-800 rounded-xl p-3.5 flex flex-col justify-between hover:border-emerald-500/40 transition-all group relative">
+    <div className="m-panel bg-zinc-900/80 border border-zinc-800 rounded-xl p-3.5 h-[206px] overflow-hidden flex flex-col justify-between hover:border-emerald-500/40 transition-all group relative">
       <div>
         {/* Header row */}
-        <div className="flex items-start justify-between">
-          <div className="flex items-center gap-2.5">
+        <div className="flex items-start justify-between gap-2">
+          <div className="flex items-center gap-2.5 min-w-0 flex-1">
             <div
-              className="w-8 h-8 rounded-lg flex items-center justify-center text-sm font-semibold shadow-inner"
+              className="w-8 h-8 shrink-0 rounded-lg flex items-center justify-center text-sm font-semibold shadow-inner"
               style={{
                 backgroundColor: `${bucket.color}20`,
                 color: bucket.color,
@@ -231,17 +231,17 @@ export const BucketCard: React.FC<BucketCardProps> = ({
             >
               <PiggyBank className="w-4 h-4" />
             </div>
-            <div>
-              <h3 className="text-sm font-bold text-zinc-100 tracking-tight">
+            <div className="min-w-0">
+              <h3 className="text-sm font-bold text-zinc-100 tracking-tight truncate">
                 {bucket.name}
               </h3>
-              <span className="text-[11px] text-emerald-400 font-mono">
+              <span className="text-[11px] text-emerald-400 font-mono block truncate">
                 Savings Goal
               </span>
             </div>
           </div>
 
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-1.5 shrink-0">
             {isGoalReached ? (
               <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 font-semibold flex items-center gap-1">
                 <CheckCircle className="w-3 h-3" />

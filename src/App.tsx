@@ -511,24 +511,30 @@ export default function App() {
         </section>
 
         <section
-          className="lg:col-span-5 lg:min-h-0 flex flex-col anim-rise"
+          className="lg:col-span-5 lg:min-h-0 flex flex-col gap-3 anim-rise"
           style={{ animationDelay: "110ms" }}
         >
-          <BucketList
-            buckets={buckets}
-            transactions={transactions}
-            currentMonth={currentMonth}
-            onEditBucket={(b) => {
-              setBucketToEdit(b);
-              setIsBucketFormOpen(true);
-            }}
-            onDeleteBucket={handleRequestDeleteBucket}
-            onQuickAction={handleQuickAction}
-            onAddNewBucket={() => {
-              setBucketToEdit(null);
-              setIsBucketFormOpen(true);
-            }}
-            onOpenSmartSavings={() => setIsSmartSavingsOpen(true)}
+          <div className="lg:flex-1 lg:min-h-0 flex flex-col">
+            <BucketList
+              buckets={buckets}
+              transactions={transactions}
+              currentMonth={currentMonth}
+              onEditBucket={(b) => {
+                setBucketToEdit(b);
+                setIsBucketFormOpen(true);
+              }}
+              onDeleteBucket={handleRequestDeleteBucket}
+              onQuickAction={handleQuickAction}
+              onAddNewBucket={() => {
+                setBucketToEdit(null);
+                setIsBucketFormOpen(true);
+              }}
+              onOpenSmartSavings={() => setIsSmartSavingsOpen(true)}
+            />
+          </div>
+          <InsightsBanner
+            insights={insights}
+            onActionClick={handleInsightAction}
           />
         </section>
 
@@ -540,22 +546,16 @@ export default function App() {
             allowance={dailyAllowance}
             onSweepToGoals={handleSweepToGoals}
           />
-          <div className="lg:flex-1 lg:min-h-0 lg:m-scroll lg:pr-1 flex flex-col gap-3">
-            <InsightsBanner
-              insights={insights}
-              onActionClick={handleInsightAction}
-            />
-            <DebtsSummary
-              transactions={transactions}
-              onSettlePerson={handleSettleDebt}
-            />
-            <TransactionList
-              transactions={transactions}
-              buckets={buckets}
-              currentMonth={currentMonth}
-              onDeleteTransaction={handleDeleteTransaction}
-            />
-          </div>
+          <DebtsSummary
+            transactions={transactions}
+            onSettlePerson={handleSettleDebt}
+          />
+          <TransactionList
+            transactions={transactions}
+            buckets={buckets}
+            currentMonth={currentMonth}
+            onDeleteTransaction={handleDeleteTransaction}
+          />
         </section>
       </main>
 

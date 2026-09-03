@@ -44,7 +44,7 @@ export const DebtsSummary: React.FC<DebtsSummaryProps> = ({
   const grandTotal = people.reduce((s, p) => s + p.total, 0);
 
   return (
-    <div className="m-panel bg-zinc-900/60 border border-amber-500/30 rounded-2xl p-3.5 space-y-3">
+    <div className="m-panel shrink-0 border-amber-500/40 p-3.5 space-y-3">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <HandCoins className="w-4 h-4 text-amber-400" />
