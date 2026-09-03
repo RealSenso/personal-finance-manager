@@ -294,7 +294,7 @@ export const TransactionList: React.FC<TransactionListProps> = ({
               .reduce((s, t) => s + t.amount, 0);
             return (
               <div key={g.date}>
-                <div className="sticky top-0 z-10 bg-zinc-900 flex items-center justify-between py-1.5 border-b border-zinc-800">
+                <div className="lg:sticky lg:top-0 z-10 bg-zinc-900 flex items-center justify-between py-1.5 border-b border-zinc-800">
                   <span className="text-[11px] font-semibold text-zinc-300">
                     {dayLabel(g.date)}
                   </span>
@@ -365,7 +365,7 @@ export const TransactionList: React.FC<TransactionListProps> = ({
                           {formatCurrency(tx.amount)}
                         </span>
 
-                        <div className="shrink-0 flex items-center gap-0.5 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
+                        <div className="shrink-0 flex items-center gap-0.5 opacity-70 sm:opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
                           <button
                             type="button"
                             onClick={() => onEditTransaction(tx)}

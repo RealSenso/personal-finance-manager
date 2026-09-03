@@ -72,8 +72,8 @@ export const MonthlyHistoryModal: React.FC<MonthlyHistoryModalProps> = ({
   });
 
   const W = 520;
-  const H = 190;
-  const pad = { l: 8, r: 8, t: 8, b: 22 };
+  const H = 198;
+  const pad = { l: 8, r: 8, t: 18, b: 22 };
   const bw = 34;
   const step = (W - pad.l - pad.r) / Math.max(1, perMonth.length);
   const chartH = H - pad.t - pad.b;
