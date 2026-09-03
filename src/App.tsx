@@ -94,6 +94,7 @@ export default function App() {
   >();
   const [expenseInitialType, setExpenseInitialType] =
     useState<TransactionType>("expense");
+  const [editingTx, setEditingTx] = useState<Transaction | null>(null);
   const [isWeeklyDigestOpen, setIsWeeklyDigestOpen] = useState(false);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [isSmartSavingsOpen, setIsSmartSavingsOpen] = useState(false);
@@ -119,6 +120,7 @@ export default function App() {
   anyModalOpenRef.current = anyModalOpen;
 
   const openAddExpense = () => {
+    setEditingTx(null);
     setExpenseInitialBucketId(undefined);
     setExpenseInitialType("expense");
     setIsAddExpenseOpen(true);
@@ -328,10 +330,53 @@ export default function App() {
     });
   };
 
+  const handleEditTransaction = (tx: Transaction) => {
+    setEditingTx(tx);
+    setIsAddExpenseOpen(true);
+  };
+
+  // Apply an edit: reverse the old transaction's effect on savings-goal
+  // balances, apply the new one, then replace it in the ledger.
+  const goalDelta = (tx: Transaction, sign: 1 | -1) =>
+    tx.type === "savings_deposit" ? sign * tx.amount : 0;
+
+  const handleUpdateTransaction = (updated: Transaction) => {
+    const old = transactions.find((t) => t.id === updated.id);
+    if (!old) return;
+
+    const nextTxs = transactions
+      .map((t) => (t.id === updated.id ? updated : t))
+      .sort((a, b) => b.date.localeCompare(a.date));
+    commitTxs(nextTxs);
+
+    // Net balance change per savings-goal bucket
+    const net = new Map<string, number>();
+    const add = (bid: string, v: number) =>
+      net.set(bid, (net.get(bid) || 0) + v);
+    add(old.bucketId, goalDelta(old, -1));
+    add(updated.bucketId, goalDelta(updated, 1));
+
+    if ([...net.values()].some((v) => v !== 0)) {
+      commitBuckets(
+        buckets.map((b) => {
+          const d = net.get(b.id);
+          if (!d || b.type !== "savings_goal") return b;
+          return { ...b, currentBalance: Math.max(0, b.currentBalance + d) };
+        }),
+      );
+    }
+
+    setEditingTx(null);
+    showToast(`Updated ${formatCurrency(updated.amount)}`);
+    const m = updated.date.slice(0, 7);
+    if (m !== currentMonth) setCurrentMonth(m);
+  };
+
   const handleQuickAction = (
     bucket: Bucket,
     type: "expense" | "savings_deposit",
   ) => {
+    setEditingTx(null);
     setExpenseInitialBucketId(bucket.id);
     setExpenseInitialType(type);
     setIsAddExpenseOpen(true);
@@ -555,6 +600,7 @@ export default function App() {
             buckets={buckets}
             currentMonth={currentMonth}
             onDeleteTransaction={handleDeleteTransaction}
+            onEditTransaction={handleEditTransaction}
           />
         </section>
       </main>
@@ -562,9 +608,14 @@ export default function App() {
       {/* Modals */}
       <AddExpenseModal
         isOpen={isAddExpenseOpen}
-        onClose={() => setIsAddExpenseOpen(false)}
+        onClose={() => {
+          setIsAddExpenseOpen(false);
+          setEditingTx(null);
+        }}
         buckets={buckets}
         onAddTransaction={handleAddTransaction}
+        editTx={editingTx}
+        onUpdateTransaction={handleUpdateTransaction}
         initialBucketId={expenseInitialBucketId}
         initialType={expenseInitialType}
       />

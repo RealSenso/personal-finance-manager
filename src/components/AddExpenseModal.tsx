@@ -17,20 +17,29 @@ interface AddExpenseModalProps {
   onAddTransaction: (
     transaction: Omit<Transaction, "id" | "createdAt">,
   ) => void;
+  /** When set, the dialog edits this transaction instead of creating one. */
+  editTx?: Transaction | null;
+  onUpdateTransaction?: (tx: Transaction) => void;
   initialBucketId?: string;
   initialType?: TransactionType;
 }
 
 const today = () => new Date().toISOString().slice(0, 10);
+const sameName = (a?: string, b?: string) =>
+  (a || "").trim().toLowerCase() === (b || "").trim().toLowerCase();
 
 export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
   isOpen,
   onClose,
   buckets,
   onAddTransaction,
+  editTx,
+  onUpdateTransaction,
   initialBucketId,
   initialType = "expense",
 }) => {
+  const isEdit = !!editTx;
+
   const [type, setType] = useState<TransactionType>(initialType);
   const [bucketId, setBucketId] = useState("");
   const [amount, setAmount] = useState("");
@@ -42,10 +51,20 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
 
   const active = buckets.filter((b) => !b.isArchived);
 
-  // Re-seed the form every time the dialog opens (so "Log Spend" on a card
-  // preselects that card's envelope, and stale values don't linger).
+  // Re-seed the form every time the dialog opens.
   useEffect(() => {
     if (!isOpen) return;
+    if (editTx) {
+      setType(editTx.type);
+      setBucketId(editTx.bucketId);
+      setAmount(String(editTx.amount));
+      setNote(editTx.note || "");
+      setPaidBy(editTx.paidBy === "other" ? "other" : "me");
+      setCounterparty(editTx.counterparty || "");
+      setDate(editTx.date);
+      setError("");
+      return;
+    }
     const startType = initialType;
     setType(startType);
     const pool =
@@ -64,7 +83,7 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
     setDate(today());
     setError("");
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen, initialBucketId, initialType]);
+  }, [isOpen, editTx, initialBucketId, initialType]);
 
   if (!isOpen) return null;
 
@@ -90,17 +109,33 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
     const borrowed = type === "expense" && paidBy === "other";
     if (borrowed && !counterparty.trim()) return setError("Who paid for you?");
     setError("");
-    onAddTransaction({
+
+    const common = {
       bucketId,
       amount: n,
       type,
       date,
       note: note.trim() || (type === "expense" ? "Expense" : "Deposit"),
-      source: "manual",
       paidBy: type === "expense" ? paidBy : undefined,
       counterparty: borrowed ? counterparty.trim() : undefined,
-      settled: borrowed ? false : undefined,
-    });
+    };
+
+    if (isEdit && editTx && onUpdateTransaction) {
+      const keepSettled =
+        editTx.paidBy === "other" &&
+        sameName(editTx.counterparty, counterparty);
+      onUpdateTransaction({
+        ...editTx,
+        ...common,
+        settled: borrowed ? (keepSettled ? editTx.settled : false) : undefined,
+      });
+    } else {
+      onAddTransaction({
+        ...common,
+        source: "manual",
+        settled: borrowed ? false : undefined,
+      });
+    }
     onClose();
   };
 
@@ -113,6 +148,12 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
   const field =
     "w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-zinc-200 focus:outline-none focus:border-emerald-500";
 
+  const title = isEdit
+    ? "Edit transaction"
+    : type === "expense"
+      ? "Log an expense"
+      : "Log a savings deposit";
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/30 backdrop-blur-xs">
       <div className="m-panel w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95 duration-150">
@@ -123,9 +164,7 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
             ) : (
               <PiggyBank className="w-4 h-4 text-emerald-300" />
             )}
-            <h3 className="text-sm font-semibold text-zinc-100">
-              {type === "expense" ? "Log an expense" : "Log a savings deposit"}
-            </h3>
+            <h3 className="text-sm font-semibold text-zinc-100">{title}</h3>
           </div>
           <button
             onClick={onClose}
@@ -276,7 +315,7 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
               type="submit"
               className="px-5 py-2 rounded-xl text-xs font-semibold text-zinc-950 bg-emerald-400 hover:bg-emerald-500 transition-colors cursor-pointer"
             >
-              Save
+              {isEdit ? "Save changes" : "Save"}
             </button>
           </div>
         </form>

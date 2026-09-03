@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Receipt, Search, Trash2, HandCoins } from "lucide-react";
+import { Receipt, Search, Trash2, Pencil, HandCoins } from "lucide-react";
 import { Bucket, Transaction } from "../types";
 import { formatCurrency } from "../lib/insights";
 
@@ -8,6 +8,7 @@ interface TransactionListProps {
   buckets: Bucket[];
   currentMonth: string;
   onDeleteTransaction: (id: string) => void;
+  onEditTransaction: (tx: Transaction) => void;
 }
 
 export const TransactionList: React.FC<TransactionListProps> = ({
@@ -15,6 +16,7 @@ export const TransactionList: React.FC<TransactionListProps> = ({
   buckets,
   currentMonth,
   onDeleteTransaction,
+  onEditTransaction,
 }) => {
   const [query, setQuery] = useState("");
   const [bucketFilter, setBucketFilter] = useState("all");
@@ -157,14 +159,24 @@ export const TransactionList: React.FC<TransactionListProps> = ({
                   {formatCurrency(tx.amount)}
                 </span>
 
-                <button
-                  type="button"
-                  onClick={() => onDeleteTransaction(tx.id)}
-                  className="shrink-0 text-zinc-400 hover:text-rose-400 p-1 rounded opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity cursor-pointer"
-                  title="Delete"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                </button>
+                <div className="shrink-0 flex items-center gap-0.5 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
+                  <button
+                    type="button"
+                    onClick={() => onEditTransaction(tx)}
+                    className="text-zinc-400 hover:text-emerald-300 p-1 rounded cursor-pointer"
+                    title="Edit"
+                  >
+                    <Pencil className="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onDeleteTransaction(tx.id)}
+                    className="text-zinc-400 hover:text-rose-400 p-1 rounded cursor-pointer"
+                    title="Delete"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
               </li>
             );
           })
