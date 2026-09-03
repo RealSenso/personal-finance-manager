@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   GoogleAuthProvider,
+  getRedirectResult,
   onAuthStateChanged,
   signInWithPopup,
+  signInWithRedirect,
   signOut,
   type User,
 } from 'firebase/auth';
@@ -29,6 +31,21 @@ const pick = (s: AppSnapshot): AppSnapshot => ({
   rules: s.rules,
 });
 
+const newRev = () =>
+  typeof crypto !== 'undefined' && crypto.randomUUID
+    ? crypto.randomUUID()
+    : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+
+function logErr(where: string, e: unknown): string {
+  const code =
+    (e as { code?: string })?.code ||
+    (e as { message?: string })?.message ||
+    String(e);
+  // eslint-disable-next-line no-console
+  console.error(`[sync] ${where}:`, code, e);
+  return code;
+}
+
 /**
  * Active multi-device sync via a single Firestore document at users/{uid}.
  * Last write wins; local edits are debounced up, remote edits stream down.
@@ -39,26 +56,38 @@ export function useCloudSync({ snapshot, onRemote }: Args) {
   const [status, setStatus] = useState<SyncStatus>(
     firebaseEnabled ? 'signed_out' : 'disabled'
   );
+  const [lastError, setLastError] = useState<string | null>(null);
+
+  const fail = useCallback((where: string, e: unknown) => {
+    setLastError(logErr(where, e));
+    setStatus('error');
+  }, []);
 
   const snapshotRef = useRef(snapshot);
   snapshotRef.current = snapshot;
   const onRemoteRef = useRef(onRemote);
   onRemoteRef.current = onRemote;
 
-  const revRef = useRef('');               // rev we last wrote or applied
-  const appliedSerializedRef = useRef(''); // content last received from remote
-  const readyRef = useRef(false);          // first snapshot received for this user
+  const revRef = useRef('');
+  const appliedSerializedRef = useRef('');
+  const readyRef = useRef(false);
   const timerRef = useRef<number | null>(null);
 
-  // Auth state
+  // Auth state (+ complete any redirect sign-in)
   useEffect(() => {
     if (!firebaseEnabled || !auth) return;
+    getRedirectResult(auth).catch((e) => fail('redirect-result', e));
     return onAuthStateChanged(auth, (u) => {
       setUser(u);
       readyRef.current = false;
-      setStatus(u ? 'connecting' : 'signed_out');
+      if (u) {
+        setLastError(null);
+        setStatus('connecting');
+      } else {
+        setStatus('signed_out');
+      }
     });
-  }, []);
+  }, [fail]);
 
   // Stream the user's document
   useEffect(() => {
@@ -71,19 +100,18 @@ export function useCloudSync({ snapshot, onRemote }: Args) {
         const data = snap.data() as (AppSnapshot & { rev?: string }) | undefined;
 
         if (!snap.exists() || !data || !data.buckets) {
-          // Brand-new account: seed it with whatever this device currently has.
-          const rev = crypto.randomUUID();
+          const rev = newRev();
           revRef.current = rev;
           appliedSerializedRef.current = JSON.stringify(pick(snapshotRef.current));
           setDoc(ref, { ...pick(snapshotRef.current), rev, updatedAt: serverTimestamp() })
             .then(() => setStatus('synced'))
-            .catch(() => setStatus('error'));
+            .catch((e) => fail('seed-write', e));
           return;
         }
 
         if (data.rev && data.rev === revRef.current) {
           setStatus('synced');
-          return; // our own write echoing back
+          return;
         }
 
         const incoming = pick(data);
@@ -95,21 +123,20 @@ export function useCloudSync({ snapshot, onRemote }: Args) {
         }
         setStatus('synced');
       },
-      () => setStatus('error')
+      (e) => fail('snapshot', e)
     );
     return unsub;
-  }, [user]);
+  }, [user, fail]);
 
   // Push local changes up (debounced)
   const serialized = JSON.stringify(pick(snapshot));
   useEffect(() => {
     if (!firebaseEnabled || !db || !user || !readyRef.current) return;
-    // This exact state just came down from remote — don't echo it back.
     if (serialized === appliedSerializedRef.current) return;
 
     if (timerRef.current) window.clearTimeout(timerRef.current);
     timerRef.current = window.setTimeout(() => {
-      const rev = crypto.randomUUID();
+      const rev = newRev();
       revRef.current = rev;
       setStatus('connecting');
       setDoc(doc(db!, 'users', user.uid), {
@@ -118,28 +145,46 @@ export function useCloudSync({ snapshot, onRemote }: Args) {
         updatedAt: serverTimestamp(),
       })
         .then(() => setStatus('synced'))
-        .catch(() => setStatus('error'));
+        .catch((e) => fail('push', e));
     }, 1000);
 
     return () => {
       if (timerRef.current) window.clearTimeout(timerRef.current);
     };
-  }, [serialized, user]);
+  }, [serialized, user, fail]);
 
   const signIn = useCallback(async () => {
     if (!auth) return;
+    setLastError(null);
+    setStatus('connecting');
+    const provider = new GoogleAuthProvider();
     try {
-      setStatus('connecting');
-      await signInWithPopup(auth, new GoogleAuthProvider());
-    } catch {
-      setStatus('error');
+      await signInWithPopup(auth, provider);
+    } catch (e) {
+      const code = (e as { code?: string })?.code || '';
+      // Popup blocked / unsupported → fall back to a full-page redirect.
+      if (
+        code.includes('popup') ||
+        code.includes('cancelled') ||
+        code.includes('operation-not-supported')
+      ) {
+        try {
+          await signInWithRedirect(auth, provider);
+          return;
+        } catch (e2) {
+          fail('signin-redirect', e2);
+          return;
+        }
+      }
+      fail('signin-popup', e);
     }
-  }, []);
+  }, [fail]);
 
   const signOutNow = useCallback(async () => {
     if (!auth) return;
     revRef.current = '';
     appliedSerializedRef.current = '';
+    readyRef.current = false;
     await signOut(auth);
   }, []);
 
@@ -147,6 +192,7 @@ export function useCloudSync({ snapshot, onRemote }: Args) {
     enabled: firebaseEnabled,
     status,
     user,
+    lastError,
     signIn,
     signOut: signOutNow,
   };

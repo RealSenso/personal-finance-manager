@@ -64,9 +64,10 @@ export const DailyAllowanceWidget: React.FC<DailyAllowanceWidgetProps> = ({
             </div>
 
             <p className="text-xs text-zinc-400 mt-1">
-              {formatCurrency(allowance.remainingSpendable)} left to spend after setting aside{' '}
-              {formatCurrency(allowance.savingsReserve)} for goals and{' '}
-              {formatCurrency(allowance.fixedCommitments)} for fixed bills.
+              {formatCurrency(allowance.remainingSpendable)} left this month after{' '}
+              {formatCurrency(allowance.savingsReserve)} savings +{' '}
+              {formatCurrency(allowance.goalCommitments)} goal deposits +{' '}
+              {formatCurrency(allowance.fixedCommitments)} fixed bills.
             </p>
           </div>
         </div>

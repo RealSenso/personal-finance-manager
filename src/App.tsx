@@ -516,6 +516,7 @@ export default function App() {
             enabled={cloud.enabled}
             status={cloud.status}
             email={cloud.user?.email ?? null}
+            lastError={cloud.lastError}
             onSignIn={cloud.signIn}
             onSignOut={cloud.signOut}
           />

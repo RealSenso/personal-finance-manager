@@ -175,10 +175,13 @@ export const DashboardStats: React.FC<DashboardStatsProps> = ({
               {formatCurrency(da.remainingSpendable)} left · {formatCurrency(da.flexSpent)} spent
             </div>
           </div>
-          <div className="mt-3 pt-2.5 border-t border-zinc-800/80 flex items-center justify-between text-[11px] text-zinc-400">
-            <span>Reserved for goals</span>
+          <div
+            className="mt-3 pt-2.5 border-t border-zinc-800/80 flex items-center justify-between text-[11px] text-zinc-400"
+            title={`${formatCurrency(da.savingsReserve)} savings + ${formatCurrency(da.goalCommitments)} goal deposits + ${formatCurrency(da.fixedCommitments)} fixed bills`}
+          >
+            <span>Reserved (save + goals + bills)</span>
             <span className="font-mono text-indigo-400 font-medium">
-              {formatCurrency(da.savingsReserve)}
+              {formatCurrency(da.totalReserved)}
             </span>
           </div>
         </div>

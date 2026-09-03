@@ -265,9 +265,20 @@ export function evaluateFinancialInsights(
     }
   }
 
-  // 5. RULE: Smart daily spending allowance (income - savings reserve - fixed bills).
+  // 5. RULE: Smart daily spending allowance
+  //    (income − savings reserve − goal deposits − fixed bills, over remaining days).
   const da = calculateDailyAllowance(buckets, transactions, incomeProfile, monthStr, currentDate);
-  if (da.todayStatus === 'exceeded') {
+  if (da.monthlySpendable <= 0 && da.totalReserved > 0) {
+    insights.push({
+      id: 'ins-no-spendable',
+      type: 'alert',
+      title: 'Nothing Left to Spend This Month',
+      message: `Your reservations (${formatCurrency(da.savingsReserve)} savings + ${formatCurrency(da.goalCommitments)} goal deposits + ${formatCurrency(da.fixedCommitments)} fixed bills = ${formatCurrency(da.totalReserved)}) meet or exceed your ${formatCurrency(da.totalIncome)} income. Lower your savings rate or a goal's monthly deposit to free up day-to-day money.`,
+      metric: `${formatCurrency(da.totalReserved)} reserved`,
+      actionText: 'Adjust',
+      actionType: 'adjust_budget',
+    });
+  } else if (da.todayStatus === 'exceeded') {
     insights.push({
       id: 'ins-daily-allowance-exceeded',
       type: 'alert',
@@ -280,7 +291,7 @@ export function evaluateFinancialInsights(
       id: 'ins-daily-allowance-on-track',
       type: 'info',
       title: 'Daily Spending Allowance',
-      message: `After reserving ${formatCurrency(da.savingsReserve)} for goals and ${formatCurrency(da.fixedCommitments)} for fixed bills, you have ${formatCurrency(da.remainingSpendable)} to spend over ${da.remainingDays} days — about ${formatCurrency(da.safeDailyAllowance)}/day. ${formatCurrency(Math.max(0, da.todayRemaining))} left for today.`,
+      message: `After setting aside ${formatCurrency(da.savingsReserve)} savings, ${formatCurrency(da.goalCommitments)} goal deposits and ${formatCurrency(da.fixedCommitments)} fixed bills, ${formatCurrency(da.remainingSpendable)} is left to spend over ${da.remainingDays} days — about ${formatCurrency(da.safeDailyAllowance)}/day. ${formatCurrency(Math.max(0, da.todayRemaining))} left for today.`,
       metric: `${formatCurrency(da.safeDailyAllowance)}/day safe`,
     });
   }
@@ -434,7 +445,7 @@ export function generateWeeklyDigest(
 
   const da = calculateDailyAllowance(buckets, transactions, incomeProfile, monthStr, currentDate);
   recommendations.push(
-    `Day-to-day budget: ${formatCurrency(da.safeDailyAllowance)}/day (${formatCurrency(da.remainingSpendable)} left for ${da.remainingDays} days) after reserving ${formatCurrency(da.savingsReserve)} for goals.`
+    `Day-to-day budget: ${formatCurrency(da.safeDailyAllowance)}/day (${formatCurrency(da.remainingSpendable)} left for ${da.remainingDays} days) after ${formatCurrency(da.totalReserved)} reserved for savings, goal deposits and fixed bills.`
   );
   if (da.underspendPool >= 500) {
     recommendations.push(

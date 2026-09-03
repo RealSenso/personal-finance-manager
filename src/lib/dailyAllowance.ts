@@ -7,12 +7,18 @@ export interface DailyExpenseAllowance {
   daysElapsed: number;
   remainingDays: number; // includes today
 
-  // Monthly cash model
+  // Monthly cash model — income minus, in order:
+  //   1. savingsReserve   (savings rate % of income — general savings)
+  //   2. goalCommitments  (scheduled deposits into savings goals this month)
+  //   3. fixedCommitments (fixed bills: subscriptions, rent, recharge)
+  //   = monthlySpendable  (everything left is day-to-day spending)
   totalIncome: number;
   savingsRatePercent: number;
-  savingsReserve: number;      // income locked for goals before any day-to-day budget
-  fixedCommitments: number;    // fixed bills (subscriptions, rent, recharge) for the month
-  monthlySpendable: number;    // what's actually free to spend day-to-day this month
+  savingsReserve: number;
+  goalCommitments: number;
+  fixedCommitments: number;
+  totalReserved: number;       // savingsReserve + goalCommitments + fixedCommitments
+  monthlySpendable: number;
   baselineDaily: number;       // steady-state target = monthlySpendable / days in month
 
   // Discretionary spend so far
@@ -78,6 +84,14 @@ export function calculateDailyAllowance(
   const savingsRatePercent = Math.min(90, Math.max(0, incomeProfile.savingsRatePercent ?? 25));
   const savingsReserve = Math.round((totalIncome * savingsRatePercent) / 100);
 
+  // --- Scheduled goal deposits (planned, or more if already deposited this month) ---
+  const savingsGoals = buckets.filter((b) => b.type === 'savings_goal' && !b.isArchived);
+  const goalDepositsPlanned = savingsGoals.reduce((s, b) => s + b.plannedMonthly, 0);
+  const goalDepositsActual = transactions
+    .filter((tx) => tx.type === 'savings_deposit' && tx.date.startsWith(currentMonth))
+    .reduce((s, tx) => s + tx.amount, 0);
+  const goalCommitments = Math.max(goalDepositsPlanned, goalDepositsActual);
+
   // --- Fixed bills vs flexible envelopes ---
   const recurring = buckets.filter((b) => b.type === 'recurring' && !b.isArchived);
   const fixedIds = new Set(recurring.filter((b) => b.isFixed).map((b) => b.id));
@@ -99,8 +113,9 @@ export function calculateDailyAllowance(
   const flexExpenses = monthExpenses.filter((tx) => !fixedIds.has(tx.bucketId));
   const flexSpent = flexExpenses.reduce((s, tx) => s + tx.amount, 0);
 
-  // --- The budget ---
-  const monthlySpendable = Math.max(0, totalIncome - savingsReserve - fixedCommitments);
+  // --- The budget: income, minus savings, minus goal deposits, minus fixed bills ---
+  const totalReserved = savingsReserve + goalCommitments + fixedCommitments;
+  const monthlySpendable = Math.max(0, totalIncome - totalReserved);
   const baselineDaily = Math.round(monthlySpendable / totalDaysInMonth);
   const remainingSpendable = Math.max(0, monthlySpendable - flexSpent);
   const safeDailyAllowance = Math.round(remainingSpendable / remainingDays);
@@ -145,7 +160,9 @@ export function calculateDailyAllowance(
     totalIncome,
     savingsRatePercent,
     savingsReserve,
+    goalCommitments,
     fixedCommitments,
+    totalReserved,
     monthlySpendable,
     baselineDaily,
     flexSpent,

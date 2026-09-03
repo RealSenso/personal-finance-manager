@@ -2,7 +2,7 @@
 // 100% local (localStorage only) and every export here is null / a no-op.
 import { initializeApp, type FirebaseApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider, type Auth } from 'firebase/auth';
-import { getFirestore, type Firestore } from 'firebase/firestore';
+import { initializeFirestore, type Firestore } from 'firebase/firestore';
 
 const cfg = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -22,7 +22,10 @@ let db: Firestore | null = null;
 if (firebaseEnabled) {
   app = initializeApp(cfg as Required<typeof cfg>);
   auth = getAuth(app);
-  db = getFirestore(app);
+  // ignoreUndefinedProperties: transactions/buckets carry optional fields that are
+  // sometimes explicitly `undefined` (e.g. merchant, counterparty). Without this,
+  // setDoc() throws "Unsupported field value: undefined" and sync breaks.
+  db = initializeFirestore(app, { ignoreUndefinedProperties: true });
 }
 
 export { app, auth, db };
