@@ -229,7 +229,8 @@ export default function App() {
       Math.max(1, (g.targetAmount || 0) - g.currentBalance),
     );
     const totalNeed = needs.reduce((s, n) => s + n, 0);
-    const today = new Date().toISOString().slice(0, 10);
+    const now = new Date();
+    const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
     const deposits: Transaction[] = [];
     let allocated = 0;
     goals.forEach((g, i) => {

@@ -24,7 +24,12 @@ interface AddExpenseModalProps {
   initialType?: TransactionType;
 }
 
-const today = () => new Date().toISOString().slice(0, 10);
+const today = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
+    d.getDate(),
+  ).padStart(2, "0")}`;
+};
 const sameName = (a?: string, b?: string) =>
   (a || "").trim().toLowerCase() === (b || "").trim().toLowerCase();
 
