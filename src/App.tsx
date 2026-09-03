@@ -212,7 +212,10 @@ export default function App() {
     if (m !== currentMonth) setCurrentMonth(m);
   };
 
-  const handleSweepToGoals = (amount: number) => {
+  // Move `amount` into savings goals (weighted by how much each still needs),
+  // dated `date` (defaults to today) — used by the widget/insight for the whole
+  // month's surplus and by the ledger's Day view for a single day's leftover.
+  const handleSweepToGoals = (amount: number, date?: string) => {
     const sweep = Math.floor(amount);
     if (sweep < 1) return;
     const goals = buckets.filter(
@@ -230,7 +233,10 @@ export default function App() {
     );
     const totalNeed = needs.reduce((s, n) => s + n, 0);
     const now = new Date();
-    const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+    const when =
+      date ||
+      `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+    const stamp = Date.now();
     const deposits: Transaction[] = [];
     let allocated = 0;
     goals.forEach((g, i) => {
@@ -241,11 +247,11 @@ export default function App() {
       if (share <= 0) return;
       allocated += share;
       deposits.push({
-        id: `sweep-${Date.now()}-${i}`,
+        id: `sweep-${stamp}-${i}`,
         bucketId: g.id,
         amount: share,
         type: "savings_deposit",
-        date: today,
+        date: when,
         note: "Swept from daily-spend surplus",
         merchant: "Auto Sweep",
         source: "manual",
@@ -254,7 +260,11 @@ export default function App() {
     });
     if (deposits.length === 0) return;
     const byId = new Map(deposits.map((d) => [d.bucketId, d.amount]));
-    commitTxs([...deposits, ...transactions]);
+    commitTxs(
+      [...deposits, ...transactions].sort((a, b) =>
+        b.date.localeCompare(a.date),
+      ),
+    );
     commitBuckets(
       buckets.map((b) =>
         byId.has(b.id)
@@ -265,6 +275,8 @@ export default function App() {
     showToast(
       `Swept ${formatCurrency(allocated)} into ${deposits.length} goal${deposits.length > 1 ? "s" : ""}`,
     );
+    const m = when.slice(0, 7);
+    if (m !== currentMonth) setCurrentMonth(m);
   };
 
   const handleSettleDebt = (counterparty: string) => {
@@ -599,9 +611,11 @@ export default function App() {
           <TransactionList
             transactions={transactions}
             buckets={buckets}
+            incomeProfile={incomeProfile}
             currentMonth={currentMonth}
             onDeleteTransaction={handleDeleteTransaction}
             onEditTransaction={handleEditTransaction}
+            onSweepToGoals={handleSweepToGoals}
           />
         </section>
       </main>

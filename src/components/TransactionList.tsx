@@ -7,16 +7,21 @@ import {
   HandCoins,
   ChevronLeft,
   ChevronRight,
+  PiggyBank,
+  ArrowRight,
 } from "lucide-react";
-import { Bucket, Transaction } from "../types";
+import { Bucket, Transaction, UserIncomeProfile } from "../types";
 import { formatCurrency } from "../lib/insights";
+import { calculateDailyAllowance } from "../lib/dailyAllowance";
 
 interface TransactionListProps {
   transactions: Transaction[];
   buckets: Bucket[];
+  incomeProfile: UserIncomeProfile;
   currentMonth: string;
   onDeleteTransaction: (id: string) => void;
   onEditTransaction: (tx: Transaction) => void;
+  onSweepToGoals: (amount: number, date: string) => void;
 }
 
 type Scope = "day" | "month" | "all";
@@ -59,9 +64,11 @@ const monthLabel = (m: string) => {
 export const TransactionList: React.FC<TransactionListProps> = ({
   transactions,
   buckets,
+  incomeProfile,
   currentMonth,
   onDeleteTransaction,
   onEditTransaction,
+  onSweepToGoals,
 }) => {
   const [scope, setScope] = useState<Scope>("month");
   const [day, setDay] = useState(todayIso());
@@ -71,6 +78,40 @@ export const TransactionList: React.FC<TransactionListProps> = ({
   const byId = new Map(buckets.map((b) => [b.id, b]));
 
   const stepDay = (n: number) => setDay(addDays(day, n));
+
+  // Day-view manual sweep: this day's discretionary spend vs the steady daily
+  // budget for its month; the leftover can be pushed into savings goals.
+  const fixedIds = new Set(
+    buckets.filter((b) => b.type === "recurring" && b.isFixed).map((b) => b.id),
+  );
+  const dayBudget = calculateDailyAllowance(
+    buckets,
+    transactions,
+    incomeProfile,
+    day.slice(0, 7),
+    parseLocal(day),
+  ).baselineDaily;
+  const daySpent = transactions
+    .filter(
+      (t) =>
+        t.type === "expense" && t.date === day && !fixedIds.has(t.bucketId),
+    )
+    .reduce((s, t) => s + t.amount, 0);
+  const daySwept = transactions
+    .filter(
+      (t) =>
+        t.type === "savings_deposit" &&
+        t.merchant === "Auto Sweep" &&
+        t.date === day,
+    )
+    .reduce((s, t) => s + t.amount, 0);
+  const dayLeftover = Math.max(0, Math.round(dayBudget - daySpent - daySwept));
+  const openGoals = buckets.some(
+    (b) =>
+      b.type === "savings_goal" &&
+      !b.isArchived &&
+      b.currentBalance < (b.targetAmount || 0),
+  );
 
   const rows = transactions
     .filter((t) => {
@@ -136,37 +177,71 @@ export const TransactionList: React.FC<TransactionListProps> = ({
         </div>
 
         {scope === "day" ? (
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => stepDay(-1)}
-              className="p-1.5 rounded-lg border border-zinc-800 text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 transition-colors cursor-pointer"
-              title="Previous day"
-            >
-              <ChevronLeft className="w-3.5 h-3.5" />
-            </button>
-            <input
-              type="date"
-              value={day}
-              max={todayIso()}
-              onChange={(e) => e.target.value && setDay(e.target.value)}
-              className={`${field} flex-1 px-2.5 py-1.5 font-mono text-center`}
-            />
-            <button
-              onClick={() => stepDay(1)}
-              disabled={day >= todayIso()}
-              className="p-1.5 rounded-lg border border-zinc-800 text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 disabled:opacity-30 disabled:hover:bg-transparent transition-colors cursor-pointer"
-              title="Next day"
-            >
-              <ChevronRight className="w-3.5 h-3.5" />
-            </button>
-            {day !== todayIso() && (
+          <div className="space-y-2.5">
+            <div className="flex items-center gap-2">
               <button
-                onClick={() => setDay(todayIso())}
-                className="px-2.5 py-1.5 rounded-lg text-[11px] font-medium border border-zinc-800 text-zinc-400 hover:text-zinc-100 transition-colors cursor-pointer"
+                onClick={() => stepDay(-1)}
+                className="p-1.5 rounded-lg border border-zinc-800 text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 transition-colors cursor-pointer"
+                title="Previous day"
               >
-                Today
+                <ChevronLeft className="w-3.5 h-3.5" />
               </button>
-            )}
+              <input
+                type="date"
+                value={day}
+                max={todayIso()}
+                onChange={(e) => e.target.value && setDay(e.target.value)}
+                className={`${field} flex-1 px-2.5 py-1.5 font-mono text-center`}
+              />
+              <button
+                onClick={() => stepDay(1)}
+                disabled={day >= todayIso()}
+                className="p-1.5 rounded-lg border border-zinc-800 text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 disabled:opacity-30 disabled:hover:bg-transparent transition-colors cursor-pointer"
+                title="Next day"
+              >
+                <ChevronRight className="w-3.5 h-3.5" />
+              </button>
+              {day !== todayIso() && (
+                <button
+                  onClick={() => setDay(todayIso())}
+                  className="px-2.5 py-1.5 rounded-lg text-[11px] font-medium border border-zinc-800 text-zinc-400 hover:text-zinc-100 transition-colors cursor-pointer"
+                >
+                  Today
+                </button>
+              )}
+            </div>
+
+            {/* This day's leftover → savings goals */}
+            <div className="flex items-center justify-between gap-2 rounded-lg border border-zinc-800 bg-zinc-950 px-2.5 py-2">
+              <span className="text-[11px] text-zinc-400">
+                Spent{" "}
+                <span className="font-mono text-zinc-200">
+                  {formatCurrency(daySpent)}
+                </span>{" "}
+                of {formatCurrency(Math.round(dayBudget))}/day
+                {daySwept > 0 && (
+                  <span className="text-emerald-300">
+                    {" "}
+                    · {formatCurrency(daySwept)} swept
+                  </span>
+                )}
+              </span>
+              {dayLeftover >= 1 && openGoals ? (
+                <button
+                  type="button"
+                  onClick={() => onSweepToGoals(dayLeftover, day)}
+                  className="shrink-0 inline-flex items-center gap-1 rounded-md bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 px-2 py-1 text-[11px] font-semibold hover:bg-emerald-500/20 transition-colors cursor-pointer"
+                >
+                  <PiggyBank className="w-3 h-3" />
+                  Sweep {formatCurrency(dayLeftover)}
+                  <ArrowRight className="w-3 h-3" />
+                </button>
+              ) : (
+                <span className="text-[11px] text-zinc-500">
+                  {dayLeftover < 1 ? "no leftover" : "no open goals"}
+                </span>
+              )}
+            </div>
           </div>
         ) : (
           <div className="flex items-center gap-2">
