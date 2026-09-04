@@ -6,6 +6,7 @@ import {
   UserIncomeProfile,
   RuleInsight,
   TransactionType,
+  Investment,
 } from "./types";
 import {
   loadBuckets,
@@ -14,10 +15,13 @@ import {
   saveTransactions,
   loadIncomeProfile,
   saveIncomeProfile,
+  loadInvestments,
+  saveInvestments,
   initStorageIfEmpty,
 } from "./lib/storage";
 import { evaluateFinancialInsights, formatCurrency } from "./lib/insights";
 import { calculateDailyAllowance } from "./lib/dailyAllowance";
+import { withdrawalPreview } from "./lib/investments";
 import { useCloudSync } from "./lib/useCloudSync";
 import type { AppSnapshot } from "./types";
 import { SyncButton } from "./components/SyncButton";
@@ -38,6 +42,8 @@ import {
   ConfirmDeleteState,
 } from "./components/ConfirmDeleteModal";
 import { SmartSavingsModal } from "./components/SmartSavingsModal";
+import { InvestmentsPanel } from "./components/InvestmentsPanel";
+import { InvestmentsModal } from "./components/InvestmentsModal";
 
 interface ToastNotice {
   id: string;
@@ -57,6 +63,9 @@ export default function App() {
   const [buckets, setBuckets] = useState<Bucket[]>(() => loadBuckets());
   const [transactions, setTransactions] = useState<Transaction[]>(() =>
     loadTransactions(),
+  );
+  const [investments, setInvestments] = useState<Investment[]>(() =>
+    loadInvestments(),
   );
 
   const [toasts, setToasts] = useState<ToastNotice[]>([]);
@@ -98,6 +107,7 @@ export default function App() {
   const [isWeeklyDigestOpen, setIsWeeklyDigestOpen] = useState(false);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [isSmartSavingsOpen, setIsSmartSavingsOpen] = useState(false);
+  const [isInvestOpen, setIsInvestOpen] = useState(false);
   const [isBucketFormOpen, setIsBucketFormOpen] = useState(false);
   const [bucketToEdit, setBucketToEdit] = useState<Bucket | null>(null);
   const [confirmDeleteState, setConfirmDeleteState] =
@@ -115,6 +125,7 @@ export default function App() {
     isHistoryOpen ||
     isSmartSavingsOpen ||
     isBucketFormOpen ||
+    isInvestOpen ||
     confirmDeleteState.isOpen;
   const anyModalOpenRef = useRef(anyModalOpen);
   anyModalOpenRef.current = anyModalOpen;
@@ -145,6 +156,74 @@ export default function App() {
     setIncomeProfile(p);
     saveIncomeProfile(p);
     showToast("Income updated");
+  };
+
+  const commitInvestments = (v: Investment[]) => {
+    setInvestments(v);
+    saveInvestments(v);
+  };
+  const handleSaveInvestment = (inv: Investment) => {
+    const exists = investments.some((i) => i.id === inv.id);
+    commitInvestments(
+      exists
+        ? investments.map((i) => (i.id === inv.id ? inv : i))
+        : [...investments, inv],
+    );
+    showToast(exists ? `Updated "${inv.name}"` : `Tracking "${inv.name}"`);
+  };
+  const handleDeleteInvestment = (id: string) => {
+    const inv = investments.find((i) => i.id === id);
+    commitInvestments(investments.filter((i) => i.id !== id));
+    if (inv) showToast(`Removed "${inv.name}"`);
+  };
+  const handleContributeToInvestment = (
+    id: string,
+    amount: number,
+    date: string,
+  ) => {
+    const inv = investments.find((i) => i.id === id);
+    if (!inv || amount <= 0) return;
+    commitInvestments(
+      investments.map((i) =>
+        i.id === id
+          ? {
+              ...i,
+              contributions: [
+                ...(i.contributions || []),
+                { id: `c-${Date.now()}`, amount, date },
+              ],
+            }
+          : i,
+      ),
+    );
+  };
+  const handleWithdrawInvestment = (
+    id: string,
+    amount: number,
+    date: string,
+  ) => {
+    const inv = investments.find((i) => i.id === id);
+    if (!inv) return;
+    const pv = withdrawalPreview(inv, amount, date);
+    commitInvestments(
+      investments.map((i) =>
+        i.id === id
+          ? {
+              ...i,
+              withdrawals: [
+                ...(i.withdrawals || []),
+                { id: `w-${Date.now()}`, amount, date },
+              ],
+            }
+          : i,
+      ),
+    );
+    showToast(
+      `Took out ${formatCurrency(Math.round(pv.value))} — profit ${
+        pv.profit >= 0 ? "+" : "−"
+      }${formatCurrency(Math.abs(Math.round(pv.profit)))}`,
+      pv.profit >= 0 ? "success" : "info",
+    );
   };
 
   const handleSaveBucket = (data: Omit<Bucket, "id">, bucketId?: string) => {
@@ -463,9 +542,11 @@ export default function App() {
     saveBuckets(snap.buckets);
     setTransactions(snap.transactions);
     saveTransactions(snap.transactions);
+    setInvestments(snap.investments || []);
+    saveInvestments(snap.investments || []);
   };
   const cloud = useCloudSync({
-    snapshot: { income: incomeProfile, buckets, transactions },
+    snapshot: { income: incomeProfile, buckets, transactions, investments },
     onRemote: applyRemote,
   });
 
@@ -566,6 +647,10 @@ export default function App() {
             transactions={transactions}
             currentMonth={currentMonth}
           />
+          <InvestmentsPanel
+            investments={investments}
+            onOpen={() => setIsInvestOpen(true)}
+          />
         </section>
 
         <section
@@ -612,10 +697,12 @@ export default function App() {
             transactions={transactions}
             buckets={buckets}
             incomeProfile={incomeProfile}
+            investments={investments}
             currentMonth={currentMonth}
             onDeleteTransaction={handleDeleteTransaction}
             onEditTransaction={handleEditTransaction}
             onSweepToGoals={handleSweepToGoals}
+            onContributeInvestment={handleContributeToInvestment}
           />
         </section>
       </main>
@@ -677,6 +764,14 @@ export default function App() {
           setConfirmDeleteState((prev) => ({ ...prev, isOpen: false }))
         }
         onConfirm={handleExecuteConfirmedDelete}
+      />
+      <InvestmentsModal
+        isOpen={isInvestOpen}
+        onClose={() => setIsInvestOpen(false)}
+        investments={investments}
+        onSave={handleSaveInvestment}
+        onDelete={handleDeleteInvestment}
+        onWithdraw={handleWithdrawInvestment}
       />
     </div>
   );

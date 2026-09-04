@@ -24,6 +24,7 @@ const pick = (s: AppSnapshot): AppSnapshot => ({
   income: s.income,
   buckets: s.buckets,
   transactions: s.transactions,
+  investments: s.investments || [],
 });
 
 const newRev = () =>

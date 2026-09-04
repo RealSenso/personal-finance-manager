@@ -44,6 +44,27 @@ export interface IncomeStream {
   amount: number;
 }
 
+// Lump-sum investment lot (e.g. a one-time buy into a liquid mutual fund).
+// Value is projected with:  amount * (1 + annualRatePercent/100) ^ (daysHeld / 365)
+export interface InvestmentEntry {
+  id: string;
+  amount: number;
+  date: string; // YYYY-MM-DD
+}
+export type InvestmentWithdrawal = InvestmentEntry;
+export type InvestmentContribution = InvestmentEntry;
+
+export interface Investment {
+  id: string;
+  name: string; // fund / label
+  amount: number; // opening lump sum invested
+  date: string; // YYYY-MM-DD invested on
+  annualRatePercent: number; // expected annual return, %
+  contributions?: InvestmentContribution[]; // later top-ups (e.g. a daily ₹100)
+  withdrawals?: InvestmentWithdrawal[];
+  createdAt?: string;
+}
+
 export interface UserIncomeProfile {
   stipend: number;
   extra: number;
@@ -111,4 +132,5 @@ export interface AppSnapshot {
   income: UserIncomeProfile;
   buckets: Bucket[];
   transactions: Transaction[];
+  investments: Investment[];
 }

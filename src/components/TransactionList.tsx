@@ -10,7 +10,7 @@ import {
   PiggyBank,
   ArrowRight,
 } from "lucide-react";
-import { Bucket, Transaction, UserIncomeProfile } from "../types";
+import { Bucket, Transaction, UserIncomeProfile, Investment } from "../types";
 import { formatCurrency } from "../lib/insights";
 import { calculateDailyAllowance } from "../lib/dailyAllowance";
 
@@ -18,11 +18,15 @@ interface TransactionListProps {
   transactions: Transaction[];
   buckets: Bucket[];
   incomeProfile: UserIncomeProfile;
+  investments: Investment[];
   currentMonth: string;
   onDeleteTransaction: (id: string) => void;
   onEditTransaction: (tx: Transaction) => void;
   onSweepToGoals: (amount: number, date: string) => void;
+  onContributeInvestment: (id: string, amount: number, date: string) => void;
 }
+
+const MF_DAILY_CAP = 100;
 
 type Scope = "day" | "month" | "all";
 
@@ -65,15 +69,19 @@ export const TransactionList: React.FC<TransactionListProps> = ({
   transactions,
   buckets,
   incomeProfile,
+  investments,
   currentMonth,
   onDeleteTransaction,
   onEditTransaction,
   onSweepToGoals,
+  onContributeInvestment,
 }) => {
   const [scope, setScope] = useState<Scope>("month");
   const [day, setDay] = useState(todayIso());
   const [query, setQuery] = useState("");
   const [bucketFilter, setBucketFilter] = useState("all");
+  const [mfInput, setMfInput] = useState("");
+  const [mfFundId, setMfFundId] = useState("");
 
   const byId = new Map(buckets.map((b) => [b.id, b]));
 
@@ -105,13 +113,39 @@ export const TransactionList: React.FC<TransactionListProps> = ({
         t.date === day,
     )
     .reduce((s, t) => s + t.amount, 0);
-  const dayLeftover = Math.max(0, Math.round(dayBudget - daySpent - daySwept));
+
+  // Split-sweep: optionally divert a small fixed amount into a mutual fund
+  // (capped per day), the rest goes to savings goals.
+  const funds = investments;
+  const mfToday = funds
+    .flatMap((f) => f.contributions || [])
+    .filter((c) => c.date === day)
+    .reduce((s, c) => s + c.amount, 0);
+
+  const dayLeftover = Math.max(
+    0,
+    Math.round(dayBudget - daySpent - daySwept - mfToday),
+  );
   const openGoals = buckets.some(
     (b) =>
       b.type === "savings_goal" &&
       !b.isArchived &&
       b.currentBalance < (b.targetAmount || 0),
   );
+  const mfCap = Math.max(0, Math.min(MF_DAILY_CAP - mfToday, dayLeftover));
+  const activeFundId = mfFundId || funds[0]?.id || "";
+  const mfAmt = Math.max(
+    0,
+    Math.min(mfCap, Math.round(parseFloat(mfInput || "0") || 0)),
+  );
+  const goalsAmt = Math.max(0, dayLeftover - mfAmt);
+
+  const doSweep = () => {
+    if (mfAmt > 0 && activeFundId)
+      onContributeInvestment(activeFundId, mfAmt, day);
+    if (goalsAmt > 0) onSweepToGoals(goalsAmt, day);
+    setMfInput("");
+  };
 
   const rows = transactions
     .filter((t) => {
@@ -211,35 +245,87 @@ export const TransactionList: React.FC<TransactionListProps> = ({
               )}
             </div>
 
-            {/* This day's leftover → savings goals */}
-            <div className="flex items-center justify-between gap-2 rounded-lg border border-zinc-800 bg-zinc-950 px-2.5 py-2">
-              <span className="text-[11px] text-zinc-400">
-                Spent{" "}
-                <span className="font-mono text-zinc-200">
-                  {formatCurrency(daySpent)}
-                </span>{" "}
-                of {formatCurrency(Math.round(dayBudget))}/day
-                {daySwept > 0 && (
-                  <span className="text-emerald-300">
-                    {" "}
-                    · {formatCurrency(daySwept)} swept
+            {/* This day's leftover → goals (and optionally a small MF buy) */}
+            <div className="rounded-lg border border-zinc-800 bg-zinc-950 px-2.5 py-2 space-y-2">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-[11px] text-zinc-400">
+                  Spent{" "}
+                  <span className="font-mono text-zinc-200">
+                    {formatCurrency(daySpent)}
+                  </span>{" "}
+                  of {formatCurrency(Math.round(dayBudget))}/day
+                  {daySwept > 0 && (
+                    <span className="text-emerald-300">
+                      {" "}
+                      · {formatCurrency(daySwept)} → goals
+                    </span>
+                  )}
+                  {mfToday > 0 && (
+                    <span className="text-indigo-400">
+                      {" "}
+                      · {formatCurrency(mfToday)} → MF
+                    </span>
+                  )}
+                </span>
+                {!(dayLeftover >= 1 && (openGoals || funds.length > 0)) && (
+                  <span className="text-[11px] text-zinc-500">
+                    {dayLeftover < 1 ? "no leftover" : "nowhere to sweep"}
                   </span>
                 )}
-              </span>
-              {dayLeftover >= 1 && openGoals ? (
-                <button
-                  type="button"
-                  onClick={() => onSweepToGoals(dayLeftover, day)}
-                  className="shrink-0 inline-flex items-center gap-1 rounded-md bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 px-2 py-1 text-[11px] font-semibold hover:bg-emerald-500/20 transition-colors cursor-pointer"
-                >
-                  <PiggyBank className="w-3 h-3" />
-                  Sweep {formatCurrency(dayLeftover)}
-                  <ArrowRight className="w-3 h-3" />
-                </button>
-              ) : (
-                <span className="text-[11px] text-zinc-500">
-                  {dayLeftover < 1 ? "no leftover" : "no open goals"}
-                </span>
+              </div>
+
+              {dayLeftover >= 1 && (openGoals || funds.length > 0) && (
+                <div className="flex flex-wrap items-center gap-2">
+                  {funds.length > 0 && mfCap > 0 && (
+                    <div className="flex items-center gap-1 text-[11px] text-zinc-400">
+                      <span>MF</span>
+                      <span className="text-zinc-500">₹</span>
+                      <input
+                        type="number"
+                        min="0"
+                        max={mfCap}
+                        step="1"
+                        placeholder="0"
+                        value={mfInput}
+                        onChange={(e) => setMfInput(e.target.value)}
+                        className="w-12 bg-zinc-900 border border-zinc-800 rounded px-1.5 py-0.5 text-[11px] font-mono text-zinc-200 focus:outline-none focus:border-emerald-500"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setMfInput(String(mfCap))}
+                        className="text-emerald-300 hover:text-emerald-400"
+                        title={`Max ₹${mfCap} today`}
+                      >
+                        max
+                      </button>
+                      {funds.length > 1 && (
+                        <select
+                          value={activeFundId}
+                          onChange={(e) => setMfFundId(e.target.value)}
+                          className="bg-zinc-900 border border-zinc-800 rounded px-1 py-0.5 text-[11px] text-zinc-300 max-w-[6rem]"
+                        >
+                          {funds.map((f) => (
+                            <option key={f.id} value={f.id}>
+                              {f.name}
+                            </option>
+                          ))}
+                        </select>
+                      )}
+                    </div>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={doSweep}
+                    className="ml-auto shrink-0 inline-flex items-center gap-1 rounded-md bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 px-2 py-1 text-[11px] font-semibold hover:bg-emerald-500/20 transition-colors cursor-pointer"
+                  >
+                    <PiggyBank className="w-3 h-3" />
+                    {mfAmt > 0
+                      ? `Sweep ${formatCurrency(goalsAmt)}→goals · ${formatCurrency(mfAmt)}→MF`
+                      : `Sweep ${formatCurrency(dayLeftover)}`}
+                    <ArrowRight className="w-3 h-3" />
+                  </button>
+                </div>
               )}
             </div>
           </div>

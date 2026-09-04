@@ -1,9 +1,10 @@
-import { Bucket, Transaction, UserIncomeProfile } from "../types";
+import { Bucket, Investment, Transaction, UserIncomeProfile } from "../types";
 
 const KEYS = {
   BUCKETS: "pfm_buckets_v1",
   TRANSACTIONS: "pfm_transactions_v1",
   INCOME: "pfm_income_v1",
+  INVESTMENTS: "pfm_investments_v1",
   INITIALIZED: "pfm_initialized_v1",
 };
 
@@ -286,6 +287,10 @@ export const loadTransactions = () =>
   read<Transaction[]>(KEYS.TRANSACTIONS, DEFAULT_TRANSACTIONS);
 export const saveTransactions = (t: Transaction[]) =>
   write(KEYS.TRANSACTIONS, t);
+
+export const loadInvestments = () => read<Investment[]>(KEYS.INVESTMENTS, []);
+export const saveInvestments = (v: Investment[]) =>
+  write(KEYS.INVESTMENTS, v);
 
 export function resetToDefaults(): void {
   saveIncomeProfile(DEFAULT_INCOME);
