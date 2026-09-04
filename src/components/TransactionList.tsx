@@ -13,6 +13,7 @@ import {
 import { Bucket, Transaction, UserIncomeProfile, Investment } from "../types";
 import { formatCurrency } from "../lib/insights";
 import { calculateDailyAllowance } from "../lib/dailyAllowance";
+import { normalize } from "../lib/investments";
 
 interface TransactionListProps {
   transactions: Transaction[];
@@ -23,7 +24,9 @@ interface TransactionListProps {
   onDeleteTransaction: (id: string) => void;
   onEditTransaction: (tx: Transaction) => void;
   onSweepToGoals: (amount: number, date: string) => void;
-  onContributeInvestment: (id: string, amount: number, date: string) => void;
+  onStageInvestment: (id: string, amount: number, date: string) => void;
+  onUnstageInvestment: (id: string, entryId: string) => void;
+  onOpenInvestments: () => void;
 }
 
 const MF_DAILY_CAP = 100;
@@ -65,6 +68,18 @@ const monthLabel = (m: string) => {
   });
 };
 
+type LedgerEntry =
+  | { kind: "tx"; date: string; sort: string; tx: Transaction }
+  | {
+      kind: "stage" | "buy" | "redeem";
+      date: string;
+      sort: string;
+      fundId: string;
+      fundName: string;
+      entryId: string;
+      amount: number;
+    };
+
 export const TransactionList: React.FC<TransactionListProps> = ({
   transactions,
   buckets,
@@ -74,7 +89,9 @@ export const TransactionList: React.FC<TransactionListProps> = ({
   onDeleteTransaction,
   onEditTransaction,
   onSweepToGoals,
-  onContributeInvestment,
+  onStageInvestment,
+  onUnstageInvestment,
+  onOpenInvestments,
 }) => {
   const [scope, setScope] = useState<Scope>("month");
   const [day, setDay] = useState(todayIso());
@@ -116,9 +133,9 @@ export const TransactionList: React.FC<TransactionListProps> = ({
 
   // Split-sweep: optionally divert a small fixed amount into a mutual fund
   // (capped per day), the rest goes to savings goals.
-  const funds = investments;
+  const funds = investments.map(normalize);
   const mfToday = funds
-    .flatMap((f) => f.contributions || [])
+    .flatMap((f) => f.staged || [])
     .filter((c) => c.date === day)
     .reduce((s, c) => s + c.amount, 0);
 
@@ -141,19 +158,25 @@ export const TransactionList: React.FC<TransactionListProps> = ({
   const goalsAmt = Math.max(0, dayLeftover - mfAmt);
 
   const doSweep = () => {
-    if (mfAmt > 0 && activeFundId)
-      onContributeInvestment(activeFundId, mfAmt, day);
+    if (mfAmt > 0 && activeFundId) onStageInvestment(activeFundId, mfAmt, day);
     if (goalsAmt > 0) onSweepToGoals(goalsAmt, day);
     setMfInput("");
   };
 
-  const rows = transactions
+  // The ledger and the investment ledger, shown together.
+  const q = query.toLowerCase();
+  const inScope = (d: string) =>
+    scope === "day"
+      ? d === day
+      : scope === "month"
+        ? d.startsWith(currentMonth)
+        : true;
+
+  const txEntries: LedgerEntry[] = transactions
     .filter((t) => {
-      if (scope === "day" && t.date !== day) return false;
-      if (scope === "month" && !t.date.startsWith(currentMonth)) return false;
+      if (!inScope(t.date)) return false;
       if (bucketFilter !== "all" && t.bucketId !== bucketFilter) return false;
       if (query && scope !== "day") {
-        const q = query.toLowerCase();
         const name = byId.get(t.bucketId)?.name.toLowerCase() || "";
         if (
           !(t.note || "").toLowerCase().includes(q) &&
@@ -164,18 +187,47 @@ export const TransactionList: React.FC<TransactionListProps> = ({
       }
       return true;
     })
-    .sort(
-      (a, b) =>
-        b.date.localeCompare(a.date) ||
-        (b.createdAt || "").localeCompare(a.createdAt || ""),
-    );
+    .map((t) => ({
+      kind: "tx" as const,
+      date: t.date,
+      sort: t.createdAt || t.id,
+      tx: t,
+    }));
 
-  // group into consecutive same-date blocks (rows already date-sorted desc)
-  const groups: { date: string; items: Transaction[] }[] = [];
-  for (const tx of rows) {
+  const invEntries: LedgerEntry[] =
+    bucketFilter !== "all"
+      ? []
+      : funds.flatMap((f) => {
+          if (query && !f.name.toLowerCase().includes(q)) return [];
+          const mk = (kind: "stage" | "buy" | "redeem") => (e: {
+            id: string;
+            amount: number;
+            date: string;
+          }) => ({
+            kind,
+            date: e.date,
+            sort: e.id,
+            fundId: f.id,
+            fundName: f.name,
+            entryId: e.id,
+            amount: e.amount,
+          });
+          return [
+            ...(f.staged || []).map(mk("stage")),
+            ...(f.lots || []).map(mk("buy")),
+            ...(f.withdrawals || []).map(mk("redeem")),
+          ].filter((e) => inScope(e.date));
+        });
+
+  const entries = [...txEntries, ...invEntries].sort(
+    (a, b) => b.date.localeCompare(a.date) || b.sort.localeCompare(a.sort),
+  );
+
+  const groups: { date: string; items: LedgerEntry[] }[] = [];
+  for (const e of entries) {
     const g = groups[groups.length - 1];
-    if (g && g.date === tx.date) g.items.push(tx);
-    else groups.push({ date: tx.date, items: [tx] });
+    if (g && g.date === e.date) g.items.push(e);
+    else groups.push({ date: e.date, items: [e] });
   }
 
   const field =
@@ -201,7 +253,7 @@ export const TransactionList: React.FC<TransactionListProps> = ({
         <div className="flex items-center justify-between gap-2">
           <span className="m-label text-emerald-300 flex items-center gap-1.5">
             <Receipt className="w-3.5 h-3.5" />
-            Ledger ({rows.length})
+            Ledger ({entries.length})
           </span>
           <div className="flex items-center bg-zinc-900 border border-zinc-800 rounded-full p-0.5">
             {scopeBtn("day", "Day")}
@@ -366,36 +418,102 @@ export const TransactionList: React.FC<TransactionListProps> = ({
       <div className="mt-3 lg:flex-1 lg:min-h-0 lg:m-scroll lg:pr-1">
         {groups.length === 0 ? (
           <p className="py-10 text-center text-zinc-500 text-xs">
-            {scope === "day"
-              ? "No transactions on this day."
-              : "Nothing here yet."}
+            {scope === "day" ? "Nothing on this day." : "Nothing here yet."}
           </p>
         ) : (
           groups.map((g) => {
             const spent = g.items
-              .filter((t) => t.type === "expense")
-              .reduce((s, t) => s + t.amount, 0);
+              .filter((e) => e.kind === "tx" && e.tx.type === "expense")
+              .reduce((s, e) => s + (e.kind === "tx" ? e.tx.amount : 0), 0);
             const saved = g.items
-              .filter((t) => t.type === "savings_deposit")
-              .reduce((s, t) => s + t.amount, 0);
+              .filter((e) => e.kind === "tx" && e.tx.type === "savings_deposit")
+              .reduce((s, e) => s + (e.kind === "tx" ? e.tx.amount : 0), 0);
+            const mf = g.items
+              .filter((e) => e.kind === "stage")
+              .reduce((s, e) => s + (e.kind === "stage" ? e.amount : 0), 0);
             return (
               <div key={g.date}>
                 <div className="lg:sticky lg:top-0 z-10 bg-zinc-900 flex items-center justify-between py-1.5 border-b border-zinc-800">
                   <span className="text-[11px] font-semibold text-zinc-300">
                     {dayLabel(g.date)}
                   </span>
-                  <span className="text-[11px] font-mono text-zinc-400">
-                    {spent > 0 && `−${formatCurrency(spent)}`}
-                    {spent > 0 && saved > 0 && " · "}
+                  <span className="text-[11px] font-mono text-zinc-400 flex gap-1.5">
+                    {spent > 0 && <span>−{formatCurrency(spent)}</span>}
                     {saved > 0 && (
                       <span className="text-emerald-300">
                         +{formatCurrency(saved)}
                       </span>
                     )}
+                    {mf > 0 && (
+                      <span className="text-indigo-400">
+                        {formatCurrency(mf)}→MF
+                      </span>
+                    )}
                   </span>
                 </div>
                 <ul className="divide-y divide-zinc-800/70">
-                  {g.items.map((tx) => {
+                  {g.items.map((e) => {
+                    if (e.kind !== "tx") {
+                      const label =
+                        e.kind === "stage"
+                          ? "Set aside → "
+                          : e.kind === "buy"
+                            ? "Bought into "
+                            : "Redeemed from ";
+                      const amtTone =
+                        e.kind === "redeem"
+                          ? "text-emerald-300"
+                          : "text-indigo-400";
+                      const sign = e.kind === "redeem" ? "+" : "−";
+                      return (
+                        <li
+                          key={e.entryId}
+                          className="group flex items-center gap-3 py-2.5 hover:bg-zinc-800/30 -mx-1.5 px-1.5 rounded-lg transition-colors"
+                        >
+                          <div className="min-w-0 flex-1">
+                            <span className="text-xs text-zinc-300 truncate block">
+                              {label}
+                              <span className="text-zinc-200">{e.fundName}</span>
+                            </span>
+                            <span className="text-[10px] text-indigo-400/80">
+                              investments
+                            </span>
+                          </div>
+                          <span
+                            className={`font-mono text-xs font-semibold shrink-0 tabular-nums ${
+                              e.kind === "buy" ? "text-zinc-400" : amtTone
+                            }`}
+                          >
+                            {e.kind === "buy" ? "" : sign}
+                            {formatCurrency(e.amount)}
+                          </span>
+                          <div className="shrink-0 flex items-center gap-0.5 opacity-70 sm:opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
+                            {e.kind === "stage" ? (
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  onUnstageInvestment(e.fundId, e.entryId)
+                                }
+                                className="text-zinc-400 hover:text-rose-400 p-1 rounded cursor-pointer"
+                                title="Remove"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={onOpenInvestments}
+                                className="text-zinc-400 hover:text-emerald-300 p-1 rounded cursor-pointer"
+                                title="Open investments"
+                              >
+                                <ArrowRight className="w-3.5 h-3.5" />
+                              </button>
+                            )}
+                          </div>
+                        </li>
+                      );
+                    }
+                    const tx = e.tx;
                     const bucket = byId.get(tx.bucketId);
                     const expense = tx.type === "expense";
                     return (

@@ -7,12 +7,14 @@ import {
   TrendingUp,
   Landmark,
   ArrowDownToLine,
+  CheckCircle2,
 } from "lucide-react";
 import type { Investment } from "../types";
 import { formatCurrency } from "../lib/insights";
 import {
   portfolio,
   summarize,
+  normalize,
   withdrawalPreview,
   todayIso,
 } from "../lib/investments";
@@ -23,12 +25,13 @@ interface Props {
   investments: Investment[];
   onSave: (inv: Investment) => void;
   onDelete: (id: string) => void;
+  onBuy: (id: string, amount: number, date: string) => void;
   onWithdraw: (id: string, amount: number, date: string) => void;
+  onUnstage: (id: string, entryId: string) => void;
 }
 
 const field =
   "w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-xs text-zinc-200 focus:outline-none focus:border-emerald-500";
-
 const gainStr = (v: number) =>
   `${v >= 0 ? "+" : "−"}${formatCurrency(Math.abs(Math.round(v)))}`;
 
@@ -38,18 +41,17 @@ export const InvestmentsModal: React.FC<Props> = ({
   investments,
   onSave,
   onDelete,
+  onBuy,
   onWithdraw,
+  onUnstage,
 }) => {
   const [adding, setAdding] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
-  const [form, setForm] = useState({
-    name: "",
-    amount: "",
-    date: todayIso(),
-    rate: "7",
-  });
+  const [form, setForm] = useState({ name: "", rate: "7", min: "100" });
   const [err, setErr] = useState("");
 
+  const [buyFor, setBuyFor] = useState<string | null>(null);
+  const [buyForm, setBuyForm] = useState({ amount: "", date: todayIso() });
   const [withdrawFor, setWithdrawFor] = useState<string | null>(null);
   const [wForm, setWForm] = useState({ amount: "", date: todayIso() });
   const [wErr, setWErr] = useState("");
@@ -60,7 +62,7 @@ export const InvestmentsModal: React.FC<Props> = ({
   const p = portfolio(investments, asOf);
 
   const openAdd = () => {
-    setForm({ name: "", amount: "", date: todayIso(), rate: "7" });
+    setForm({ name: "", rate: "7", min: "100" });
     setEditId(null);
     setErr("");
     setAdding(true);
@@ -68,9 +70,8 @@ export const InvestmentsModal: React.FC<Props> = ({
   const openEdit = (inv: Investment) => {
     setForm({
       name: inv.name,
-      amount: String(inv.amount),
-      date: inv.date,
       rate: String(inv.annualRatePercent),
+      min: String(inv.minInvestment ?? 100),
     });
     setEditId(inv.id);
     setErr("");
@@ -78,30 +79,35 @@ export const InvestmentsModal: React.FC<Props> = ({
   };
   const submitForm = (e: React.FormEvent) => {
     e.preventDefault();
-    const amount = parseFloat(form.amount);
+    if (!form.name.trim()) return setErr("Name the fund");
     const rate = parseFloat(form.rate);
-    if (isNaN(amount) || amount <= 0) return setErr("Enter an amount");
+    const min = parseFloat(form.min);
     if (isNaN(rate)) return setErr("Enter an expected annual return %");
+    if (isNaN(min) || min <= 0) return setErr("Enter a minimum investment");
     const existing = investments.find((i) => i.id === editId);
+    const base = existing ? normalize(existing) : null;
     onSave({
       id: editId || `inv-${Date.now()}`,
-      name: form.name.trim() || "Liquid fund",
-      amount,
-      date: form.date,
+      name: form.name.trim(),
       annualRatePercent: rate,
-      withdrawals: existing?.withdrawals || [],
-      createdAt: existing?.createdAt || new Date().toISOString(),
+      minInvestment: min,
+      staged: base?.staged || [],
+      lots: base?.lots || [],
+      withdrawals: base?.withdrawals || [],
+      createdAt: base?.createdAt || new Date().toISOString(),
     });
     setAdding(false);
     setEditId(null);
   };
 
+  const openBuy = (inv: Investment) => {
+    const s = summarize(inv, asOf);
+    setBuyForm({ amount: String(Math.round(s.stagedTotal)), date: todayIso() });
+    setBuyFor(inv.id);
+  };
   const openWithdraw = (inv: Investment) => {
     const s = summarize(inv, asOf);
-    setWForm({
-      amount: String(Math.round(s.activePrincipal)),
-      date: todayIso(),
-    });
+    setWForm({ amount: String(Math.round(s.activePrincipal)), date: todayIso() });
     setWErr("");
     setWithdrawFor(inv.id);
   };
@@ -135,23 +141,21 @@ export const InvestmentsModal: React.FC<Props> = ({
 
         <div className="p-5 overflow-y-auto space-y-4 flex-1">
           {/* Portfolio summary */}
-          <div className="grid grid-cols-3 gap-2 text-center">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center">
             {[
-              ["Invested (active)", formatCurrency(Math.round(p.activePrincipal))],
-              ["Est. value now", formatCurrency(Math.round(p.currentValue))],
+              ["Invested", formatCurrency(Math.round(p.activePrincipal))],
+              ["Staged", formatCurrency(Math.round(p.stagedTotal))],
+              ["Est. value", formatCurrency(Math.round(p.currentValue))],
               [
-                "Total gain",
+                "Gain",
                 `${gainStr(p.totalGain)} (${p.gainPercent >= 0 ? "+" : ""}${p.gainPercent.toFixed(1)}%)`,
               ],
             ].map(([label, value], idx) => (
-              <div
-                key={label}
-                className="m-panel p-2.5 !shadow-none border-zinc-800"
-              >
+              <div key={label} className="m-panel p-2.5 !shadow-none">
                 <div className="m-label">{label}</div>
                 <div
                   className={`font-mono text-sm font-semibold mt-1 ${
-                    idx === 2
+                    idx === 3
                       ? p.totalGain >= 0
                         ? "text-emerald-300"
                         : "text-rose-400"
@@ -164,9 +168,9 @@ export const InvestmentsModal: React.FC<Props> = ({
             ))}
           </div>
           <p className="text-[11px] text-zinc-500 -mt-1">
-            Projected with{" "}
-            <span className="font-mono">amount × (1 + r)^(days ÷ 365)</span> — an
-            estimate, not a real NAV.
+            Value is projected with{" "}
+            <span className="font-mono">amount × (1 + r)^(days ÷ 365)</span> —
+            an estimate, not a real NAV. Staged money isn't invested yet.
           </p>
 
           {/* Add / edit form */}
@@ -176,51 +180,20 @@ export const InvestmentsModal: React.FC<Props> = ({
               className="m-panel p-3.5 space-y-3 border-emerald-500/30"
             >
               <div className="m-label text-emerald-300">
-                {editId ? "Edit investment" : "New investment"}
+                {editId ? "Edit investment" : "New investment — details only"}
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                <div className="sm:col-span-2">
-                  <label className="text-[11px] text-zinc-400 block mb-1">
-                    Fund / label
-                  </label>
-                  <input
-                    className={field}
-                    placeholder="e.g. ICICI Liquid Fund"
-                    value={form.name}
-                    onChange={(e) =>
-                      setForm({ ...form, name: e.target.value })
-                    }
-                  />
-                </div>
-                <div>
-                  <label className="text-[11px] text-zinc-400 block mb-1">
-                    Amount invested (₹)
-                  </label>
-                  <input
-                    type="number"
-                    step="any"
-                    min="0"
-                    className={`${field} font-mono`}
-                    value={form.amount}
-                    onChange={(e) =>
-                      setForm({ ...form, amount: e.target.value })
-                    }
-                  />
-                </div>
-                <div>
-                  <label className="text-[11px] text-zinc-400 block mb-1">
-                    Invested on
-                  </label>
-                  <input
-                    type="date"
-                    max={todayIso()}
-                    className={`${field} font-mono`}
-                    value={form.date}
-                    onChange={(e) =>
-                      setForm({ ...form, date: e.target.value })
-                    }
-                  />
-                </div>
+              <div>
+                <label className="text-[11px] text-zinc-400 block mb-1">
+                  Fund / label
+                </label>
+                <input
+                  className={field}
+                  placeholder="e.g. Aditya Birla Liquid Fund Direct-Growth"
+                  value={form.name}
+                  onChange={(e) => setForm({ ...form, name: e.target.value })}
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-2.5">
                 <div>
                   <label className="text-[11px] text-zinc-400 block mb-1">
                     Expected annual return (%)
@@ -230,9 +203,20 @@ export const InvestmentsModal: React.FC<Props> = ({
                     step="any"
                     className={`${field} font-mono`}
                     value={form.rate}
-                    onChange={(e) =>
-                      setForm({ ...form, rate: e.target.value })
-                    }
+                    onChange={(e) => setForm({ ...form, rate: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <label className="text-[11px] text-zinc-400 block mb-1">
+                    Minimum investment (₹)
+                  </label>
+                  <input
+                    type="number"
+                    step="any"
+                    min="0"
+                    className={`${field} font-mono`}
+                    value={form.min}
+                    onChange={(e) => setForm({ ...form, min: e.target.value })}
                   />
                 </div>
               </div>
@@ -264,113 +248,69 @@ export const InvestmentsModal: React.FC<Props> = ({
             </button>
           )}
 
-          {/* Lots */}
+          {/* Funds */}
           {investments.length === 0 ? (
             <p className="text-xs text-zinc-500 py-4 text-center">
-              No investments tracked yet.
+              No investments tracked yet. Add one, then set money aside for it
+              from the ledger's Day view.
             </p>
           ) : (
             <ul className="space-y-2.5">
-              {investments
-                .slice()
-                .sort((a, b) => b.date.localeCompare(a.date))
-                .map((inv) => {
-                  const s = summarize(inv, asOf);
-                  const ws = (inv.withdrawals || [])
-                    .slice()
-                    .sort((a, b) => b.date.localeCompare(a.date));
-                  const cs = (inv.contributions || [])
-                    .slice()
-                    .sort((a, b) => b.date.localeCompare(a.date));
-                  return (
-                    <li key={inv.id} className="m-panel p-3.5 border-zinc-800">
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="min-w-0">
-                          <div className="flex items-center gap-1.5">
-                            <Landmark className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
-                            <span className="text-sm font-semibold text-zinc-100 truncate">
-                              {inv.name}
-                            </span>
-                          </div>
-                          <div className="text-[11px] text-zinc-500 font-mono mt-0.5">
-                            {formatCurrency(inv.amount)} on {inv.date}
-                            {cs.length > 0 &&
-                              ` · +${cs.length} add${cs.length > 1 ? "s" : ""} (${formatCurrency(cs.reduce((a, c) => a + c.amount, 0))})`}{" "}
-                            · {inv.annualRatePercent}% p.a. · held {s.daysHeld}d
-                          </div>
+              {investments.map((raw) => {
+                const inv = normalize(raw);
+                const s = summarize(inv, asOf);
+                const staged = (inv.staged || [])
+                  .slice()
+                  .sort((a, b) => b.date.localeCompare(a.date));
+                const lots = (inv.lots || [])
+                  .slice()
+                  .sort((a, b) => b.date.localeCompare(a.date));
+                const ws = (inv.withdrawals || [])
+                  .slice()
+                  .sort((a, b) => b.date.localeCompare(a.date));
+                return (
+                  <li key={inv.id} className="m-panel p-3.5">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-1.5">
+                          <Landmark className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
+                          <span className="text-sm font-semibold text-zinc-100 truncate">
+                            {inv.name}
+                          </span>
                         </div>
-                        <div className="flex items-center gap-0.5 shrink-0">
-                          <button
-                            type="button"
-                            onClick={() => openEdit(inv)}
-                            className="p-1.5 text-zinc-400 hover:text-emerald-300 rounded cursor-pointer"
-                            title="Edit"
-                          >
-                            <Pencil className="w-3.5 h-3.5" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => onDelete(inv.id)}
-                            className="p-1.5 text-zinc-400 hover:text-rose-400 rounded cursor-pointer"
-                            title="Delete"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
+                        <div className="text-[11px] text-zinc-500 font-mono mt-0.5">
+                          {inv.annualRatePercent}% p.a. · min{" "}
+                          {formatCurrency(inv.minInvestment)}
+                          {s.investedPrincipal > 0 &&
+                            ` · held ${s.daysHeld}d`}
                         </div>
                       </div>
-
-                      <div className="mt-2.5 grid grid-cols-3 gap-2 font-mono text-xs">
-                        <div>
-                          <div className="text-[10px] text-zinc-500">Active</div>
-                          <div className="text-zinc-200">
-                            {formatCurrency(Math.round(s.activePrincipal))}
-                          </div>
-                        </div>
-                        <div>
-                          <div className="text-[10px] text-zinc-500">
-                            Est. value
-                          </div>
-                          <div className="text-zinc-200">
-                            {formatCurrency(Math.round(s.currentValue))}
-                          </div>
-                        </div>
-                        <div>
-                          <div className="text-[10px] text-zinc-500">Gain</div>
-                          <div
-                            className={
-                              s.totalGain >= 0
-                                ? "text-emerald-300"
-                                : "text-rose-400"
-                            }
-                          >
-                            {gainStr(s.totalGain)} (
-                            {s.gainPercent >= 0 ? "+" : ""}
-                            {s.gainPercent.toFixed(1)}%)
-                          </div>
-                        </div>
+                      <div className="flex items-center gap-0.5 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => openEdit(inv)}
+                          className="p-1.5 text-zinc-400 hover:text-emerald-300 rounded cursor-pointer"
+                          title="Edit"
+                        >
+                          <Pencil className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => onDelete(inv.id)}
+                          className="p-1.5 text-zinc-400 hover:text-rose-400 rounded cursor-pointer"
+                          title="Delete"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
                       </div>
+                    </div>
 
-                      {s.realizedGain !== 0 && (
-                        <div className="mt-2 text-[11px] text-zinc-400">
-                          Realised so far:{" "}
-                          <span
-                            className={
-                              s.realizedGain >= 0
-                                ? "text-emerald-300"
-                                : "text-rose-400"
-                            }
-                          >
-                            {gainStr(s.realizedGain)}
-                          </span>{" "}
-                          from {ws.length} withdrawal{ws.length > 1 ? "s" : ""}
-                        </div>
-                      )}
-
-                      {/* Withdraw */}
-                      {withdrawFor === inv.id ? (
-                        <div className="mt-3 rounded-lg border border-zinc-800 bg-zinc-950 p-3 space-y-2.5">
-                          <div className="m-label text-amber-400">
-                            Take money out
+                    {/* Staged → ready to buy? */}
+                    <div className="mt-2.5 rounded-lg border border-zinc-800 bg-zinc-950 p-2.5">
+                      {buyFor === inv.id ? (
+                        <div className="space-y-2">
+                          <div className="m-label text-emerald-300">
+                            Confirm purchase
                           </div>
                           <div className="grid grid-cols-2 gap-2.5">
                             <div>
@@ -382,118 +322,293 @@ export const InvestmentsModal: React.FC<Props> = ({
                                 step="any"
                                 min="0"
                                 className={`${field} font-mono`}
-                                value={wForm.amount}
+                                value={buyForm.amount}
                                 onChange={(e) =>
-                                  setWForm({ ...wForm, amount: e.target.value })
+                                  setBuyForm({
+                                    ...buyForm,
+                                    amount: e.target.value,
+                                  })
                                 }
                               />
                             </div>
                             <div>
                               <label className="text-[11px] text-zinc-400 block mb-1">
-                                On date
+                                Bought on
                               </label>
                               <input
                                 type="date"
                                 max={todayIso()}
                                 className={`${field} font-mono`}
-                                value={wForm.date}
+                                value={buyForm.date}
                                 onChange={(e) =>
-                                  setWForm({ ...wForm, date: e.target.value })
+                                  setBuyForm({
+                                    ...buyForm,
+                                    date: e.target.value,
+                                  })
                                 }
                               />
                             </div>
                           </div>
-                          {(() => {
-                            const amt = parseFloat(wForm.amount);
-                            if (isNaN(amt) || amt <= 0) return null;
-                            const pv = withdrawalPreview(inv, amt, wForm.date);
-                            return (
-                              <div className="text-[11px] text-zinc-300">
-                                Held {pv.days}d · expected value ≈{" "}
-                                <span className="font-mono">
-                                  {formatCurrency(Math.round(pv.value))}
-                                </span>{" "}
-                                · profit{" "}
-                                <span
-                                  className={`font-mono font-semibold ${
-                                    pv.profit >= 0
-                                      ? "text-emerald-300"
-                                      : "text-rose-400"
-                                  }`}
-                                >
-                                  {gainStr(pv.profit)} (
-                                  {amt > 0
-                                    ? ((pv.profit / amt) * 100).toFixed(1)
-                                    : "0"}
-                                  %)
-                                </span>
-                              </div>
-                            );
-                          })()}
-                          {wErr && (
-                            <div className="text-[11px] text-rose-400">
-                              {wErr}
-                            </div>
-                          )}
+                          <p className="text-[11px] text-zinc-500">
+                            Moves this much from staged into the fund; anything
+                            left stays staged.
+                          </p>
                           <div className="flex justify-end gap-2">
                             <button
                               type="button"
-                              onClick={() => setWithdrawFor(null)}
+                              onClick={() => setBuyFor(null)}
                               className="px-3 py-1 text-xs text-zinc-400 hover:text-zinc-100"
                             >
                               Cancel
                             </button>
                             <button
                               type="button"
-                              onClick={() => confirmWithdraw(inv)}
+                              onClick={() => {
+                                const a = Math.min(
+                                  parseFloat(buyForm.amount) || 0,
+                                  s.stagedTotal,
+                                );
+                                if (a > 0) onBuy(inv.id, a, buyForm.date);
+                                setBuyFor(null);
+                              }}
                               className="px-3 py-1 rounded-lg text-xs font-semibold text-zinc-950 bg-emerald-400 hover:bg-emerald-500 transition-colors"
                             >
-                              Confirm
+                              Confirm buy
                             </button>
                           </div>
                         </div>
                       ) : (
-                        s.activePrincipal > 0 && (
-                          <button
-                            type="button"
-                            onClick={() => openWithdraw(inv)}
-                            className="mt-3 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-semibold text-emerald-300 bg-emerald-500/10 border border-emerald-500/30 hover:bg-emerald-500/20 transition-colors cursor-pointer"
-                          >
-                            <ArrowDownToLine className="w-3 h-3" />
-                            Take money out
-                          </button>
-                        )
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-[11px] text-zinc-400">
+                            Staged{" "}
+                            <span className="font-mono text-zinc-200">
+                              {formatCurrency(Math.round(s.stagedTotal))}
+                            </span>{" "}
+                            / {formatCurrency(inv.minInvestment)}
+                            {s.canBuy ? (
+                              <span className="text-emerald-300">
+                                {" "}
+                                · enough to buy
+                              </span>
+                            ) : s.stagedTotal > 0 ? (
+                              <span>
+                                {" "}
+                                · add {formatCurrency(Math.ceil(s.shortBy))} more
+                              </span>
+                            ) : null}
+                          </span>
+                          {s.canBuy && (
+                            <button
+                              type="button"
+                              onClick={() => openBuy(inv)}
+                              className="shrink-0 inline-flex items-center gap-1 rounded-md bg-emerald-500 text-zinc-950 px-2.5 py-1 text-[11px] font-bold hover:bg-emerald-400 transition-colors cursor-pointer"
+                            >
+                              <CheckCircle2 className="w-3 h-3" />
+                              Buy {formatCurrency(Math.round(s.stagedTotal))}
+                            </button>
+                          )}
+                        </div>
                       )}
-
-                      {ws.length > 0 && (
-                        <ul className="mt-2.5 space-y-1 border-t border-zinc-800/70 pt-2">
-                          {ws.map((w) => {
-                            const pv = withdrawalPreview(inv, w.amount, w.date);
-                            return (
-                              <li
-                                key={w.id}
-                                className="flex items-center justify-between text-[11px] font-mono text-zinc-400"
+                      {staged.length > 0 && buyFor !== inv.id && (
+                        <ul className="mt-2 space-y-0.5 border-t border-zinc-800/70 pt-1.5">
+                          {staged.map((e) => (
+                            <li
+                              key={e.id}
+                              className="flex items-center justify-between text-[11px] font-mono text-zinc-500"
+                            >
+                              <span>
+                                +{formatCurrency(e.amount)} on {e.date}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => onUnstage(inv.id, e.id)}
+                                className="text-zinc-500 hover:text-rose-400 cursor-pointer"
+                                title="Remove"
                               >
-                                <span>
-                                  −{formatCurrency(w.amount)} on {w.date}
-                                </span>
-                                <span
-                                  className={
-                                    pv.profit >= 0
-                                      ? "text-emerald-300"
-                                      : "text-rose-400"
-                                  }
-                                >
-                                  {gainStr(pv.profit)}
-                                </span>
-                              </li>
-                            );
-                          })}
+                                <X className="w-3 h-3" />
+                              </button>
+                            </li>
+                          ))}
                         </ul>
                       )}
-                    </li>
-                  );
-                })}
+                    </div>
+
+                    {/* Invested metrics */}
+                    {s.investedPrincipal > 0 && (
+                      <>
+                        <div className="mt-2.5 grid grid-cols-3 gap-2 font-mono text-xs">
+                          <div>
+                            <div className="text-[10px] text-zinc-500">
+                              Active
+                            </div>
+                            <div className="text-zinc-200">
+                              {formatCurrency(Math.round(s.activePrincipal))}
+                            </div>
+                          </div>
+                          <div>
+                            <div className="text-[10px] text-zinc-500">
+                              Est. value
+                            </div>
+                            <div className="text-zinc-200">
+                              {formatCurrency(Math.round(s.currentValue))}
+                            </div>
+                          </div>
+                          <div>
+                            <div className="text-[10px] text-zinc-500">Gain</div>
+                            <div
+                              className={
+                                s.totalGain >= 0
+                                  ? "text-emerald-300"
+                                  : "text-rose-400"
+                              }
+                            >
+                              {gainStr(s.totalGain)}
+                            </div>
+                          </div>
+                        </div>
+
+                        {withdrawFor === inv.id ? (
+                          <div className="mt-3 rounded-lg border border-zinc-800 bg-zinc-950 p-3 space-y-2.5">
+                            <div className="m-label text-amber-400">
+                              Take money out
+                            </div>
+                            <div className="grid grid-cols-2 gap-2.5">
+                              <div>
+                                <label className="text-[11px] text-zinc-400 block mb-1">
+                                  Amount (₹)
+                                </label>
+                                <input
+                                  type="number"
+                                  step="any"
+                                  min="0"
+                                  className={`${field} font-mono`}
+                                  value={wForm.amount}
+                                  onChange={(e) =>
+                                    setWForm({
+                                      ...wForm,
+                                      amount: e.target.value,
+                                    })
+                                  }
+                                />
+                              </div>
+                              <div>
+                                <label className="text-[11px] text-zinc-400 block mb-1">
+                                  On date
+                                </label>
+                                <input
+                                  type="date"
+                                  max={todayIso()}
+                                  className={`${field} font-mono`}
+                                  value={wForm.date}
+                                  onChange={(e) =>
+                                    setWForm({ ...wForm, date: e.target.value })
+                                  }
+                                />
+                              </div>
+                            </div>
+                            {(() => {
+                              const amt = parseFloat(wForm.amount);
+                              if (isNaN(amt) || amt <= 0) return null;
+                              const pv = withdrawalPreview(
+                                inv,
+                                amt,
+                                wForm.date,
+                              );
+                              return (
+                                <div className="text-[11px] text-zinc-300">
+                                  Held {pv.days}d · expected ≈{" "}
+                                  <span className="font-mono">
+                                    {formatCurrency(Math.round(pv.value))}
+                                  </span>{" "}
+                                  · profit{" "}
+                                  <span
+                                    className={`font-mono font-semibold ${
+                                      pv.profit >= 0
+                                        ? "text-emerald-300"
+                                        : "text-rose-400"
+                                    }`}
+                                  >
+                                    {gainStr(pv.profit)}
+                                  </span>
+                                </div>
+                              );
+                            })()}
+                            {wErr && (
+                              <div className="text-[11px] text-rose-400">
+                                {wErr}
+                              </div>
+                            )}
+                            <div className="flex justify-end gap-2">
+                              <button
+                                type="button"
+                                onClick={() => setWithdrawFor(null)}
+                                className="px-3 py-1 text-xs text-zinc-400 hover:text-zinc-100"
+                              >
+                                Cancel
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => confirmWithdraw(inv)}
+                                className="px-3 py-1 rounded-lg text-xs font-semibold text-zinc-950 bg-emerald-400 hover:bg-emerald-500 transition-colors"
+                              >
+                                Confirm
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          s.activePrincipal > 0 && (
+                            <button
+                              type="button"
+                              onClick={() => openWithdraw(inv)}
+                              className="mt-3 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-semibold text-emerald-300 bg-emerald-500/10 border border-emerald-500/30 hover:bg-emerald-500/20 transition-colors cursor-pointer"
+                            >
+                              <ArrowDownToLine className="w-3 h-3" />
+                              Take money out
+                            </button>
+                          )
+                        )}
+
+                        {(lots.length > 0 || ws.length > 0) && (
+                          <ul className="mt-2.5 space-y-1 border-t border-zinc-800/70 pt-2 text-[11px] font-mono">
+                            {lots.map((l) => (
+                              <li
+                                key={l.id}
+                                className="flex justify-between text-zinc-400"
+                              >
+                                <span>Bought {formatCurrency(l.amount)}</span>
+                                <span>{l.date}</span>
+                              </li>
+                            ))}
+                            {ws.map((w) => {
+                              const pv = withdrawalPreview(inv, w.amount, w.date);
+                              return (
+                                <li
+                                  key={w.id}
+                                  className="flex justify-between text-zinc-400"
+                                >
+                                  <span>
+                                    Redeemed {formatCurrency(w.amount)} ·{" "}
+                                    <span
+                                      className={
+                                        pv.profit >= 0
+                                          ? "text-emerald-300"
+                                          : "text-rose-400"
+                                      }
+                                    >
+                                      {gainStr(pv.profit)}
+                                    </span>
+                                  </span>
+                                  <span>{w.date}</span>
+                                </li>
+                              );
+                            })}
+                          </ul>
+                        )}
+                      </>
+                    )}
+                  </li>
+                );
+              })}
             </ul>
           )}
         </div>

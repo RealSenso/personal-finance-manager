@@ -21,7 +21,7 @@ import {
 } from "./lib/storage";
 import { evaluateFinancialInsights, formatCurrency } from "./lib/insights";
 import { calculateDailyAllowance } from "./lib/dailyAllowance";
-import { withdrawalPreview } from "./lib/investments";
+import { withdrawalPreview, executeBuy } from "./lib/investments";
 import { useCloudSync } from "./lib/useCloudSync";
 import type { AppSnapshot } from "./types";
 import { SyncButton } from "./components/SyncButton";
@@ -176,11 +176,8 @@ export default function App() {
     commitInvestments(investments.filter((i) => i.id !== id));
     if (inv) showToast(`Removed "${inv.name}"`);
   };
-  const handleContributeToInvestment = (
-    id: string,
-    amount: number,
-    date: string,
-  ) => {
+  // Set money aside for a fund (from the ledger's day-view sweep).
+  const handleStageInvestment = (id: string, amount: number, date: string) => {
     const inv = investments.find((i) => i.id === id);
     if (!inv || amount <= 0) return;
     commitInvestments(
@@ -188,11 +185,29 @@ export default function App() {
         i.id === id
           ? {
               ...i,
-              contributions: [
-                ...(i.contributions || []),
-                { id: `c-${Date.now()}`, amount, date },
+              staged: [
+                ...(i.staged || []),
+                { id: `s-${Date.now()}`, amount, date },
               ],
             }
+          : i,
+      ),
+    );
+  };
+  // Execute a purchase: move staged money into an invested lot.
+  const handleBuyInvestment = (id: string, amount: number, date: string) => {
+    const inv = investments.find((i) => i.id === id);
+    if (!inv || amount <= 0) return;
+    commitInvestments(
+      investments.map((i) => (i.id === id ? executeBuy(i, amount, date) : i)),
+    );
+    showToast(`Bought ${formatCurrency(Math.round(amount))} of "${inv.name}"`);
+  };
+  const handleUnstageInvestment = (id: string, entryId: string) => {
+    commitInvestments(
+      investments.map((i) =>
+        i.id === id
+          ? { ...i, staged: (i.staged || []).filter((s) => s.id !== entryId) }
           : i,
       ),
     );
@@ -702,7 +717,9 @@ export default function App() {
             onDeleteTransaction={handleDeleteTransaction}
             onEditTransaction={handleEditTransaction}
             onSweepToGoals={handleSweepToGoals}
-            onContributeInvestment={handleContributeToInvestment}
+            onStageInvestment={handleStageInvestment}
+            onUnstageInvestment={handleUnstageInvestment}
+            onOpenInvestments={() => setIsInvestOpen(true)}
           />
         </section>
       </main>
@@ -772,6 +789,8 @@ export default function App() {
         onSave={handleSaveInvestment}
         onDelete={handleDeleteInvestment}
         onWithdraw={handleWithdrawInvestment}
+        onBuy={handleBuyInvestment}
+        onUnstage={handleUnstageInvestment}
       />
     </div>
   );

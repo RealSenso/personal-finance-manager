@@ -51,18 +51,20 @@ export interface InvestmentEntry {
   amount: number;
   date: string; // YYYY-MM-DD
 }
-export type InvestmentWithdrawal = InvestmentEntry;
-export type InvestmentContribution = InvestmentEntry;
 
 export interface Investment {
   id: string;
   name: string; // fund / label
-  amount: number; // opening lump sum invested
-  date: string; // YYYY-MM-DD invested on
   annualRatePercent: number; // expected annual return, %
-  contributions?: InvestmentContribution[]; // later top-ups (e.g. a daily ₹100)
-  withdrawals?: InvestmentWithdrawal[];
+  minInvestment: number; // smallest lump-sum purchase the fund accepts
+  staged?: InvestmentEntry[]; // money set aside (from sweeps) not yet bought
+  lots?: InvestmentEntry[]; // executed purchases, each valued from its date
+  withdrawals?: InvestmentEntry[]; // redemptions
   createdAt?: string;
+  // legacy fields kept so older stored data still parses; folded in on load
+  amount?: number;
+  date?: string;
+  contributions?: InvestmentEntry[];
 }
 
 export interface UserIncomeProfile {
