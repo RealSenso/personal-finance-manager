@@ -52,13 +52,20 @@ export function getSavingsDepositsForMonth(
     .reduce((sum, tx) => sum + tx.amount, 0);
 }
 
-// Calculate historical average monthly deposit rate for a savings goal
+// Calculate historical average monthly deposit rate for a savings goal.
+// Only counts *completed* months of history — the current, still-accruing
+// month would otherwise drag the average down and understate the pace.
 export function calculateAverageMonthlyDepositRate(
   bucket: Bucket,
   transactions: Transaction[],
+  now: Date = new Date(),
 ): number {
+  const currentMonth = now.toISOString().slice(0, 7);
   const goalTxs = transactions.filter(
-    (tx) => tx.bucketId === bucket.id && tx.type === "savings_deposit",
+    (tx) =>
+      tx.bucketId === bucket.id &&
+      tx.type === "savings_deposit" &&
+      tx.date.slice(0, 7) !== currentMonth,
   );
 
   if (goalTxs.length === 0) {
@@ -72,7 +79,7 @@ export function calculateAverageMonthlyDepositRate(
     monthMap.set(m, (monthMap.get(m) || 0) + tx.amount);
   });
 
-  const monthsCount = Math.max(1, monthMap.size);
+  const monthsCount = monthMap.size;
   const totalDeposited = Array.from(monthMap.values()).reduce(
     (a, b) => a + b,
     0,

@@ -303,7 +303,7 @@ export const BucketCard: React.FC<BucketCardProps> = ({
           <div className="mt-2 flex items-center justify-between text-[11px] font-mono text-zinc-400">
             <div className="flex items-center gap-1 text-zinc-300">
               <TrendingUp className="w-3 h-3 text-emerald-400" />
-              <span>+{formatCurrency(bucket.plannedMonthly)}/mo</span>
+              <span>+{formatCurrency(eta.monthlyDepositRate)}/mo</span>
             </div>
             <div className="flex items-center gap-1 text-zinc-300">
               <Clock className="w-3 h-3 text-indigo-400" />
