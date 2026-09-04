@@ -1,5 +1,6 @@
 import React from "react";
 import { Plus, History, FileText, ChevronDown } from "lucide-react";
+import { getDaysInMonth } from "../lib/insights";
 
 interface HeaderProps {
   currentMonth: string;
@@ -33,6 +34,14 @@ export const Header: React.FC<HeaderProps> = ({
   const navBtn =
     "flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-xs font-medium text-zinc-300 border border-zinc-800 hover:bg-zinc-800/50 hover:text-zinc-100 transition-colors cursor-pointer";
 
+  const [cy, cm] = currentMonth.split("-").map(Number);
+  const totalDaysInMonth = getDaysInMonth(cy, cm - 1);
+  const isCurr = now.getFullYear() === cy && now.getMonth() === cm - 1;
+  const currentDay = isCurr
+    ? Math.min(now.getDate(), totalDaysInMonth)
+    : totalDaysInMonth;
+  const monthPct = Math.round((currentDay / totalDaysInMonth) * 100);
+
   return (
     <header className="shrink-0 relative z-20 border-b border-zinc-800 bg-zinc-900/70 backdrop-blur px-3 sm:px-6 py-2.5">
       <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
@@ -62,6 +71,24 @@ export const Header: React.FC<HeaderProps> = ({
               ))}
             </select>
             <ChevronDown className="w-3.5 h-3.5 text-zinc-500 absolute right-1.5 pointer-events-none" />
+          </div>
+
+          <div
+            className="flex items-center gap-2 rounded-full bg-zinc-900 border border-zinc-800 pl-3 pr-3 py-1.5 text-[11px] font-mono text-zinc-400"
+            title={`${totalDaysInMonth - currentDay} days left in cycle`}
+          >
+            <span className="text-zinc-300">
+              Day {currentDay}/{totalDaysInMonth}
+            </span>
+            <div className="w-12 h-1.5 bg-zinc-800 rounded-full overflow-hidden">
+              <div
+                className="h-full bg-gradient-to-r from-emerald-500 to-cyan-400 rounded-full"
+                style={{ width: `${monthPct}%` }}
+              />
+            </div>
+            <span className="hidden sm:inline text-zinc-500">
+              {totalDaysInMonth - currentDay}d left
+            </span>
           </div>
 
           <button

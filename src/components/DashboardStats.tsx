@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { Pencil, Wallet, Target, Flame, PiggyBank } from "lucide-react";
 import { Bucket, Transaction, UserIncomeProfile } from "../types";
-import { formatCurrency, getDaysInMonth } from "../lib/insights";
+import { formatCurrency } from "../lib/insights";
 import type { DailyExpenseAllowance } from "../lib/dailyAllowance";
 
 interface DashboardStatsProps {
@@ -69,15 +69,6 @@ export const DashboardStats: React.FC<DashboardStatsProps> = ({
   const [rateInput, setRateInput] = useState(
     (incomeProfile.savingsRatePercent ?? 25).toString(),
   );
-
-  const [year, month] = currentMonth.split("-").map(Number);
-  const totalDaysInMonth = getDaysInMonth(year, month - 1);
-  const today = new Date();
-  const isCurr = today.getFullYear() === year && today.getMonth() === month - 1;
-  const currentDay = isCurr
-    ? Math.min(today.getDate(), totalDaysInMonth)
-    : totalDaysInMonth;
-  const monthPct = Math.round((currentDay / totalDaysInMonth) * 100);
 
   const totalIncome =
     incomeProfile.stipend +
@@ -234,24 +225,6 @@ export const DashboardStats: React.FC<DashboardStatsProps> = ({
           }
         />
 
-        {/* Month timeline */}
-        <div className="m-panel bg-zinc-900/70 border border-zinc-800 rounded-xl p-3">
-          <div className="flex items-center justify-between m-label">
-            <span>
-              Day {currentDay} / {totalDaysInMonth}
-            </span>
-            <span className="text-emerald-400">{monthPct}%</span>
-          </div>
-          <div className="mt-2 h-2 bg-zinc-800 rounded-full overflow-hidden relative">
-            <div
-              className="h-full bg-gradient-to-r from-emerald-500 to-cyan-400 rounded-full transition-all"
-              style={{ width: `${monthPct}%` }}
-            />
-          </div>
-          <div className="text-[11px] text-zinc-500 mt-1.5">
-            {totalDaysInMonth - currentDay} days left in cycle
-          </div>
-        </div>
       </div>
     </div>
   );
